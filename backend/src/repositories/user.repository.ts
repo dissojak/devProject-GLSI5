@@ -1,0 +1,52 @@
+import { type UserRole } from '../domain/enums/user.enums.js';
+import { User, type UserDocument, type UserFields, type UserMethods, type UserVirtuals } from '../models/entities/index.js';
+import {
+  BaseRepository,
+  normalizedLimit,
+  normalizedPage,
+  type PaginatedResult,
+  type RepositoryFilter,
+  type RepositoryOptions,
+} from './base.repository.js';
+
+export interface UserSearch {
+  q?: string;
+  role?: UserRole;
+  includeDeleted?: boolean;
+  page?: number;
+  limit?: number;
+}
+
+/** Escapes user-provided text used inside a RegExp filter. */
+export function escapeRegex(input: string): string {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+export class UserRepository extends BaseRepository<UserFields, UserMethods, UserVirtuals> {
+  constructor() {
+    super(User);
+  }
+
+  findByEmail(email: string, options: RepositoryOptions = {}): Promise<UserDocument | null> {
+    return this.findOne({ email: email.trim().toLowerCase() }, options);
+  }
+
+  /** Admin user list: text match on name/email, optional role, optional deleted. */
+  async search(search: UserSearch): Promise<PaginatedResult<UserDocument>> {
+    const filter: RepositoryFilter<UserFields> = {};
+    const trimmed = search.q?.trim();
+    if (trimmed) {
+      const pattern = new RegExp(escapeRegex(trimmed), 'i');
+      filter.$or = [{ name: pattern }, { email: pattern }];
+    }
+    if (search.role) {
+      filter.role = search.role;
+    }
+
+    return this.paginate(
+      filter,
+      { page: normalizedPage(search.page), limit: normalizedLimit(search.limit) },
+      { withDeleted: search.includeDeleted === true },
+    );
+  }
+}

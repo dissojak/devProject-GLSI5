@@ -1,0 +1,196 @@
+import {
+  Schema,
+  default as mongoose,
+  type DefaultSchemaOptions,
+  type HydratedDocument,
+  type Model,
+} from 'mongoose';
+
+import { USER_ROLES, type UserRole } from '../../domain/enums/user.enums.js';
+import { AccountDisabledError, InvariantViolationError } from '../../domain/errors/index.js';
+import { baseSchemaOptions } from '../plugins/base-schema-options.js';
+import { softDeletePlugin, type SoftDeletableMethods } from '../plugins/soft-delete.js';
+import { argon2PasswordHasher } from '../../shared/security/password-hasher.js';
+
+/**
+ * User - a platform account. Soft-deleted means "deactivated": the document
+ * stays in the collection (its email remains reserved, per the unique index).
+ */
+
+export interface UserFields {
+  name: string;
+  email: string;
+  passwordHash: string;
+  role: UserRole;
+  lastLoginAt?: Date | null;
+}
+
+export interface UserStatics {
+  register(input: { name: string; email: string; password: string; role?: UserRole }): Promise<UserDocument>;
+}
+
+export interface UserMethods extends SoftDeletableMethods {
+  setPassword(plain: string): Promise<UserDocument>;
+  verifyPassword(plain: string): Promise<boolean>;
+  recordLogin(): Promise<UserDocument>;
+  updateProfile(patch: { name?: string }): Promise<UserDocument>;
+  changeRole(newRole: UserRole): Promise<UserDocument>;
+  deactivate(): Promise<UserDocument>;
+  reactivate(): Promise<UserDocument>;
+  isAdmin(): boolean;
+  assertCanAuthenticate(): void;
+}
+
+export type UserVirtuals = { isActive: boolean; isDeleted: boolean };
+
+export type UserDocument = HydratedDocument<UserFields, UserMethods & UserVirtuals>;
+
+export type UserBaseModel = Model<UserFields, object, UserMethods>;
+export type UserModel = UserBaseModel & UserStatics;
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const NAME_MIN = 2;
+const NAME_MAX = 100;
+const PASSWORD_MIN = 8;
+
+const userSchema = new Schema<
+  UserFields,
+  UserBaseModel,
+  UserMethods,
+  Record<string, never>,
+  UserVirtuals,
+  UserStatics,
+  DefaultSchemaOptions
+>(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+      minlength: NAME_MIN,
+      maxlength: NAME_MAX,
+    },
+    email: {
+      type: String,
+      required: true,
+      trim: true,
+      lowercase: true,
+      unique: true,
+      validate: {
+        validator: (value: string): boolean => EMAIL.test(value),
+        message: (p: { value: string }) => `Invalid email: "${p.value}"`,
+      },
+    },
+    passwordHash: { type: String, required: true, select: false },
+    role: { type: String, required: true, enum: USER_ROLES, default: 'DEVELOPER' },
+    lastLoginAt: { type: Date, default: null },
+  },
+  baseSchemaOptions(),
+);
+
+userSchema.plugin(softDeletePlugin);
+
+const assertPasswordMin = (plain: string): void => {
+  if (plain.length < PASSWORD_MIN) {
+    throw new InvariantViolationError(`Password must be at least ${PASSWORD_MIN} characters`);
+  }
+}
+
+userSchema.statics.register = async function register(
+  this: UserBaseModel,
+  input: { name: string; email: string; password: string; role?: UserRole },
+): Promise<UserDocument> {
+  assertPasswordMin(input.password);
+  const passwordHash = await argon2PasswordHasher.hash(input.password);
+  const created = new this({
+    name: input.name,
+    email: input.email,
+    passwordHash,
+    ...(input.role !== undefined ? { role: input.role } : {}),
+  });
+
+  return created.save() as unknown as Promise<UserDocument>;
+};
+
+userSchema.methods.setPassword = async function setPassword(
+  this: UserDocument,
+  plain: string,
+): Promise<UserDocument> {
+  assertPasswordMin(plain);
+  this.set('passwordHash', await argon2PasswordHasher.hash(plain));
+
+  return this.save() as unknown as Promise<UserDocument>;
+};
+
+userSchema.methods.verifyPassword = async function verifyPassword(
+  this: UserDocument,
+  plain: string,
+): Promise<boolean> {
+  const passwordHash = this.get('passwordHash') as string | undefined;
+  if (passwordHash === undefined) {
+    throw new InvariantViolationError(
+      'passwordHash is not loaded - fetch with .select("+passwordHash")',
+    );
+  }
+
+  return argon2PasswordHasher.verify(plain, passwordHash);
+};
+
+userSchema.methods.recordLogin = async function recordLogin(
+  this: UserDocument,
+): Promise<UserDocument> {
+  this.set('lastLoginAt', new Date());
+
+  return this.save() as unknown as Promise<UserDocument>;
+};
+
+userSchema.methods.updateProfile = async function updateProfile(
+  this: UserDocument,
+  patch: { name?: string },
+): Promise<UserDocument> {
+  if (patch.name !== undefined) {
+    this.set('name', patch.name.trim());
+  }
+
+  return this.save() as unknown as Promise<UserDocument>;
+};
+
+userSchema.methods.changeRole = async function changeRole(
+  this: UserDocument,
+  newRole: UserRole,
+): Promise<UserDocument> {
+  this.set('role', newRole);
+
+  return this.save() as unknown as Promise<UserDocument>;
+};
+
+userSchema.methods.deactivate = async function deactivate(
+  this: UserDocument,
+): Promise<UserDocument> {
+  return this.softDelete() as unknown as Promise<UserDocument>;
+};
+
+userSchema.methods.reactivate = async function reactivate(
+  this: UserDocument,
+): Promise<UserDocument> {
+  return this.restore() as unknown as Promise<UserDocument>;
+};
+
+userSchema.methods.isAdmin = function isAdmin(this: UserDocument): boolean {
+  return this.get('role') === 'ADMIN';
+};
+
+userSchema.methods.assertCanAuthenticate = function assertCanAuthenticate(
+  this: UserDocument,
+): void {
+  if (this.get('deletedAt') != null) {
+    throw new AccountDisabledError('Account is deactivated');
+  }
+};
+
+userSchema.virtual('isActive').get(function isActiveVirtual(this: UserDocument): boolean {
+  return this.get('deletedAt') == null;
+});
+
+export const USER_MODEL_NAME = 'User' as const;
+export const User = mongoose.model(USER_MODEL_NAME, userSchema);
