@@ -1,4 +1,3 @@
-
 import { ConflictError } from '../../domain/errors/index.js';
 import { User, type UserDocument } from '../../models/entities/index.js';
 import { UserRepository } from '../../repositories/user.repository.js';
@@ -33,8 +32,6 @@ export class AuthService implements AuthServiceContract {
   ) {}
 
   async register(input: RegisterInput): Promise<AuthUser> {
-    // Inclure les comptes désactivés :
-    // leur adresse email reste réservée.
     const existing = await this.users.findByEmail(
       input.email,
       { withDeleted: true },
@@ -45,7 +42,6 @@ export class AuthService implements AuthServiceContract {
     }
 
     try {
-      // Le modèle existant réalise le hashage Argon2.
       const user = await User.register({
         name: input.name,
         email: input.email,
@@ -54,7 +50,6 @@ export class AuthService implements AuthServiceContract {
 
       return toAuthUser(user);
     } catch (error: unknown) {
-      // Protection contre deux inscriptions simultanées.
       if (
         typeof error === 'object' &&
         error !== null &&
@@ -76,11 +71,7 @@ async login(input: LoginInput): Promise<AuthUser> {
       'Invalid email or password',
     );
   }
-
-  // Le modèle existant refuse les comptes désactivés.
   user.assertCanAuthenticate();
-
-  // Utilise Argon2 via user.model.ts.
   const isValid = await user.verifyPassword(input.password);
 
   if (!isValid) {

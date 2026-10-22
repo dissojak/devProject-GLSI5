@@ -146,6 +146,53 @@ export const swaggerDocument = {
     },
   },
     },
+    
+'/api/v1/auth/github': {
+  get: {
+    tags: ['Authentication'],
+    summary: 'Se connecter avec GitHub',
+    description: 'Démarre le flux OAuth et redirige vers GitHub.',
+    responses: {
+      '302': {
+        description: 'Redirection vers GitHub',
+      },
+    },
+  },
+},
+
+'/api/v1/auth/github/callback': {
+  get: {
+    tags: ['Authentication'],
+    summary: 'Callback GitHub OAuth',
+    description:
+      'Valide le retour GitHub, crée une session et redirige vers Next.js.',
+    parameters: [
+      {
+        name: 'code',
+        in: 'query',
+        required: true,
+        schema: { type: 'string' },
+      },
+      {
+        name: 'state',
+        in: 'query',
+        required: true,
+        schema: { type: 'string' },
+      },
+    ],
+    responses: {
+      '302': {
+        description: 'Connexion réussie',
+      },
+      '400': {
+        description: 'Callback OAuth invalide',
+      },
+      '409': {
+        description: 'Compte local existant à lier',
+      },
+    },
+  },
+},
   },
 
   components: {

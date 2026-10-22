@@ -1,4 +1,3 @@
-
 import { Router, type RequestHandler } from 'express';
 
 export function createAuthRouter(
