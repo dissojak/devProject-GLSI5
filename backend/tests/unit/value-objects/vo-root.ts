@@ -52,10 +52,13 @@ export async function expectInvariantOnPath(
   doc: VoRootDoc,
   path: string,
 ): Promise<InvariantViolationError> {
-  const rejection = await doc.validate().then(
-    () => undefined,
-    (err: { errors?: Record<string, unknown> }) => err,
-  );
+  let rejection: { errors?: Record<string, unknown> } | undefined;
+
+  try {
+    await doc.validate();
+  } catch (e: unknown) {
+    rejection = e as { errors?: Record<string, unknown> };
+  }
 
   expect(rejection?.errors).toBeDefined();
   const wrapped = (rejection?.errors ?? {}) as Record<string, unknown>;
@@ -76,8 +79,12 @@ export async function validateCaptured(doc: VoRootDoc): Promise<
     }
   | undefined
 > {
-  return await doc.validate().then(
-    () => undefined,
-    (err: { name?: string; errors?: Record<string, { message?: string }> }) => err,
-  );
+  return await (async () => {
+    try {
+      await doc.validate();
+      return undefined;
+    } catch (e: unknown) {
+      return e as { name?: string; errors?: Record<string, { message?: string }> };
+    }
+  })();
 }

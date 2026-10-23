@@ -34,6 +34,10 @@ openssl rand -base64 32        # put the output in TOKEN_ENCRYPTION_KEY
 | `CORS_ORIGINS` | Comma-separated browser origins (required) |
 | `LOG_LEVEL` | `debug` \| `info` \| `warn` \| `error` (default `info`) |
 | `TOKEN_ENCRYPTION_KEY` | Base64 that decodes to exactly 32 bytes — AES-256-GCM key for GitHub tokens (required) |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub OAuth app credentials (required) |
+| `GITHUB_CALLBACK_URL` | e.g. `http://localhost:4000/api/v1/auth/github/callback` (required) |
+| `FRONTEND_URL` | Browser origin for post-login redirects (required) |
+| `SESSION_SECRET` | Random string ≥ 32 bytes — session token signing (required; generate with `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"`) |
 
 ## Scripts
 
@@ -78,13 +82,17 @@ Phases 0–4 delivered, Phase 5 wrap-up in progress:
 - environment contract, DB connection, Express app/middleware, logging
 - domain primitives: enums, errors + central HTTP status table, value objects
   (k8s quantities, GitHub URL), framework-free state machines
+- **composition pattern** (see `docs/conventions.md` — "Composition"):
+  `app.ts` imports ONLY routes; each `routes/<feature>.routes.ts` wires its
+  own services (`createXxxService()` factories) + controllers; services
+  self-wire their repositories so `routes/` and `app.ts` never touch them
 - 10 models (User, GithubConnection, Project, Analysis, Recommendation,
   DeploymentPlan, GeneratedFile, Deployment, WorkflowRun, AuditLog) with
   behavior methods, invariants, indexes; soft delete on User/Project
 - BaseRepository + one repository per model with the contracts of Phase 4
-- 291 tests green (`build` + `lint` + `test`)
-- HTTP layer delivered so far: `GET /health` (documents: `docs/domain-model.md`,
-  `docs/conventions.md`)
+- 311 tests green (`build` + `lint` + `typecheck` + `test`)
+- HTTP layer delivered so far: `GET /health`, `/api/v1/auth` (register + login,
+  GitHub OAuth start/callback)
 
 ## Next (for the team)
 

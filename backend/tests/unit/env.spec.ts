@@ -9,6 +9,11 @@ const VALID = {
   CORS_ORIGINS: 'http://localhost:3000, http://localhost:3001',
   LOG_LEVEL: 'info',
   TOKEN_ENCRYPTION_KEY: 'RtcY2OnO4aHlOr8T+s1IMgJeDXqAtkOLEd5FIqTt45o=',
+  GITHUB_CLIENT_ID: 'test-client-id',
+  GITHUB_CLIENT_SECRET: 'test-client-secret',
+  GITHUB_CALLBACK_URL: 'http://localhost:4000/api/v1/auth/github/callback',
+  FRONTEND_URL: 'http://localhost:3000',
+  SESSION_SECRET: 'test-session-secret-that-is-at-least-32-bytes-long',
 };
 
 describe('config/env', () => {
@@ -39,6 +44,30 @@ describe('config/env', () => {
     delete withoutUri.MONGODB_URI;
 
     expect(() => loadEnv(withoutUri)).toThrow('Invalid environment configuration');
+  });
+
+  it('rejects a missing GitHub OAuth variable', () => {
+    const withoutClientId = { ...VALID } as { -readonly [K in keyof typeof VALID]?: string };
+
+    delete withoutClientId.GITHUB_CLIENT_ID;
+
+    expect(() => loadEnv(withoutClientId)).toThrow('Invalid environment configuration');
+  });
+
+  it('rejects a SESSION_SECRET shorter than 32 bytes', () => {
+    expect(() => loadEnv({ ...VALID, SESSION_SECRET: 'too-short' })).toThrow(
+      'Invalid environment configuration',
+    );
+  });
+
+  it('exposes the parsed OAuth and session values on the env object', () => {
+    const env = loadEnv(VALID);
+
+    expect(env.githubClientId).toBe('test-client-id');
+    expect(env.githubClientSecret).toBe('test-client-secret');
+    expect(env.githubCallbackUrl).toBe('http://localhost:4000/api/v1/auth/github/callback');
+    expect(env.frontendUrl).toBe('http://localhost:3000');
+    expect(env.sessionSecret).toBe('test-session-secret-that-is-at-least-32-bytes-long');
   });
 
   it('rejects an empty CORS_ORIGINS list', () => {

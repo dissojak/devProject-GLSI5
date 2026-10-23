@@ -3,12 +3,20 @@ import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
 import type { Logger } from 'pino';
+import cookieParser from 'cookie-parser';
+import swaggerUi from 'swagger-ui-express';
 
 import { getEnv } from './config/env.js';
 import { notFound } from './middleware/not-found.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { requestLogging } from './middleware/request-logging.js';
+
+// ONLY routes: routes/index.ts is THE composition root — every feature
+// wires itself there (see docs/conventions.md, "Composition").
 import { healthRouter } from './routes/health.routes.js';
+import { createApiRouter } from './routes/index.js';
+
+import { swaggerDocument } from '../docs/swagger.js';
 
 /**
  * App factory: assembles middleware and routes WITHOUT listening and WITHOUT
@@ -20,18 +28,36 @@ export function createApp(logger: Logger): Express {
   const app: Express = express();
 
   app.disable('x-powered-by');
+
   app.use(requestLogging(logger));
   app.use(helmet());
+
   app.use(
     cors({
       origin: env.corsOrigins,
       credentials: true,
     }),
   );
-  app.use(express.json({ limit: '1mb' }));
 
+  app.use(express.json({ limit: '1mb' }));
+  app.use(cookieParser(env.sessionSecret));
+
+  // API (composition lives in routes/index.ts)
+  app.use('/api/v1', createApiRouter());
+
+  // Health
   app.use(healthRouter);
 
+  // Swagger
+  if (env.nodeEnv === 'development') {
+    app.use(
+      '/api-docs',
+      swaggerUi.serve,
+      swaggerUi.setup(swaggerDocument),
+    );
+  }
+
+  // Toujours en dernier
   app.use(notFound());
   app.use(errorHandler(logger));
 

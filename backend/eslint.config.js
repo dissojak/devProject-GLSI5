@@ -9,6 +9,11 @@ import prettierConfig from 'eslint-config-prettier';
  * Enforced with `no-restricted-imports` per source directory. Files matching a
  * glob may only import from strictly LOWER layers (or external packages).
  *
+ * Composition exception: routes/ are the per-feature composition roots and
+ * may import services (`createXxxService()` factories) to wire their own
+ * controllers — but still NEVER repositories or models (services self-wire
+ * those inside their factories). Transitive import direction stays downward.
+ *
  * Patterns are segment-aware so that internal file names never collide with
  * layer-folder names (e.g. domain/errors/app-error.ts is NOT "app").
  */
@@ -85,7 +90,6 @@ const FORBIDDEN = {
   routes: [
     '*/repositories/*',
     '*/models/*',
-    '*/services/*',
     '*/app.js',
     '*/app.ts',
     '*/server.js',
@@ -151,6 +155,13 @@ export default defineConfig(
   },
   [Object.entries(FORBIDDEN).map(([dir, forbidden]) => layer(dir, forbidden))][0],
   {
+    // routes/index.ts is THE composition root (see docs/conventions.md,
+    // "Composition"): the single file allowed to build repositories and read
+    // config, so the rest of routes/ stays a pure dependency direction.
+    files: ['src/routes/index.ts'],
+    rules: { 'no-restricted-imports': 'off' },
+  },
+  {
     files: ['tests/**/*.ts'],
     rules: {
       // Value objects / invariants are constructed with valid data; assertions
@@ -170,6 +181,26 @@ export default defineConfig(
           property: 'validateSync',
           message:
             'validateSync is deprecated and skips subdoc pre-validate hooks - use `await doc.validate()`',
+        },
+        {
+          property: 'flatten',
+          message:
+            'zod 4: error.flatten() is deprecated - use z.flattenError(error)',
+        },
+        {
+          property: 'strict',
+          message:
+            'zod 4: z.object().strict() is deprecated - use z.strictObject()',
+        },
+        {
+          property: 'nonstrict',
+          message:
+            'zod 4: z.object().nonstrict() is deprecated - use z.looseObject()',
+        },
+        {
+          property: 'format',
+          message:
+            'zod 4: ZodError.format() is deprecated - use z.treeifyError(error)',
         },
       ],
     },

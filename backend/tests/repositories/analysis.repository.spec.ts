@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from 'node:timers/promises';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Types } from 'mongoose';
 
@@ -29,22 +30,20 @@ beforeEach(async () => {
 
   owner = await User.register({ name: 'owner', email: 'owner@example.com', password: 'LongEnough1!' });
   let current = await Project.createFor({ ownerId: owner._id, name: 'proj', description: 'd' });
-  current = await current
-    .connectRepository({ url: 'https://github.com/acme/repo' }, 'main')
-    .then((saved) => saved.markRepositoryVerified('main'));
+  current = await current.connectRepository({ url: 'https://github.com/acme/repo' }, 'main');
+  current = await current.markRepositoryVerified('main');
   project = current;
 
   const user2 = await User.register({ name: 'u2', email: 'u2@example.com', password: 'LongEnough1!' });
   let foreign = await Project.createFor({ ownerId: user2._id, name: 'foreign', description: 'x' });
-  foreign = await foreign
-    .connectRepository({ url: 'https://github.com/other/one' }, 'main')
-    .then((saved) => saved.markRepositoryVerified('main'));
+  foreign = await foreign.connectRepository({ url: 'https://github.com/other/one' }, 'main');
+  foreign = await foreign.markRepositoryVerified('main');
   await Analysis.request({ project: foreign, userId: USER2_ID });
 
   analyses = [];
   for (let i = 0; i < 2; i += 1) {
     analyses.push(await Analysis.request({ project, userId: owner._id }));
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await sleep(10);
   }
 });
 

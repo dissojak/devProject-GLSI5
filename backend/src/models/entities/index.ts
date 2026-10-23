@@ -121,3 +121,8 @@ export {
   type AuditLogModel,
   type AuditLogStatics,
 } from './audit-log.model.js';
+export {
+  AuthIdentity,
+  type AuthIdentityDocument,
+  type AuthIdentityFields,
+} from './auth-identity.model.js';

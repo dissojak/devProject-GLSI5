@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from 'node:timers/promises';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Types } from 'mongoose';
 
@@ -85,7 +86,7 @@ describe('DeploymentRepository', () => {
   it('lists the project deployments newest first, excluding other projects', async () => {
     const first = await createApprovedPlan('STAGING', versionCounter);
     versionCounter += 1;
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await sleep(10);
     const second = await createApprovedPlan('STAGING', versionCounter);
     versionCounter += 1;
     await second.start();

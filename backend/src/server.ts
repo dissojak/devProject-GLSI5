@@ -46,8 +46,14 @@ async function main(): Promise<void> {
   });
 }
 
-main().catch((err: unknown) => {
-  // Logger may not exist yet (e.g. invalid environment); write to stderr.
-  process.stderr.write(`Fatal startup error: ${String(err)}\n`);
-  process.exit(1);
-});
+// Async/await everywhere: entry point is an awaited bootstrap with ONE
+// try/catch - no .then/.catch chains anywhere in the codebase.
+// The logger may not exist yet (e.g. invalid environment); write to stderr.
+void (async (): Promise<void> => {
+  try {
+    await main();
+  } catch (err: unknown) {
+    process.stderr.write(`Fatal startup error: ${String(err)}\n`);
+    process.exit(1);
+  }
+})();

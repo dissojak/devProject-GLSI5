@@ -49,4 +49,17 @@ export class UserRepository extends BaseRepository<UserFields, UserMethods, User
       { withDeleted: search.includeDeleted === true },
     );
   }
+  
+async findForAuthentication(
+  email: string,
+): Promise<UserDocument | null> {
+  const query = User.findOne({
+    email: email.trim().toLowerCase(),
+  })
+    .setOptions({ withDeleted: true })
+    .select('+passwordHash');
+
+  return await query.exec();
+}
+
 }

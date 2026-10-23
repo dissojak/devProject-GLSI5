@@ -20,7 +20,7 @@ import { argon2PasswordHasher } from '../../shared/security/password-hasher.js';
 export interface UserFields {
   name: string;
   email: string;
-  passwordHash: string;
+  passwordHash?: string;
   role: UserRole;
   lastLoginAt?: Date | null;
 }
@@ -39,6 +39,7 @@ export interface UserMethods extends SoftDeletableMethods {
   reactivate(): Promise<UserDocument>;
   isAdmin(): boolean;
   assertCanAuthenticate(): void;
+  hasLocalPassword(): boolean;
 }
 
 export type UserVirtuals = { isActive: boolean; isDeleted: boolean };
@@ -81,7 +82,7 @@ const userSchema = new Schema<
         message: (p: { value: string }) => `Invalid email: "${p.value}"`,
       },
     },
-    passwordHash: { type: String, required: true, select: false },
+    passwordHash: { type: String, required: false, select: false },
     role: { type: String, required: true, enum: USER_ROLES, default: 'DEVELOPER' },
     lastLoginAt: { type: Date, default: null },
   },
@@ -122,19 +123,35 @@ userSchema.methods.setPassword = async function setPassword(
   return this.save() as unknown as Promise<UserDocument>;
 };
 
+
 userSchema.methods.verifyPassword = async function verifyPassword(
   this: UserDocument,
   plain: string,
 ): Promise<boolean> {
-  const passwordHash = this.get('passwordHash') as string | undefined;
-  if (passwordHash === undefined) {
+
+  // Vérifier que le champ a été chargé depuis MongoDB
+  if (!this.isSelected('passwordHash')) {
     throw new InvariantViolationError(
       'passwordHash is not loaded - fetch with .select("+passwordHash")',
     );
   }
 
-  return argon2PasswordHasher.verify(plain, passwordHash);
+  const passwordHash = this.get('passwordHash') as
+    | string
+    | undefined;
+
+  // Un utilisateur GitHub peut ne pas avoir de mot de passe
+  if (!passwordHash) {
+    return false;
+  }
+
+  // Vérifier le mot de passe local avec Argon2
+  return argon2PasswordHasher.verify(
+    plain,
+    passwordHash,
+  );
 };
+
 
 userSchema.methods.recordLogin = async function recordLogin(
   this: UserDocument,
@@ -186,6 +203,26 @@ userSchema.methods.assertCanAuthenticate = function assertCanAuthenticate(
   if (this.get('deletedAt') != null) {
     throw new AccountDisabledError('Account is deactivated');
   }
+};
+
+userSchema.methods.hasLocalPassword = function hasLocalPassword(
+  this: UserDocument,
+): boolean {
+
+  if (!this.isSelected('passwordHash')) {
+    throw new InvariantViolationError(
+      'passwordHash is not loaded',
+    );
+  }
+
+  const passwordHash = this.get('passwordHash') as
+    | string
+    | undefined;
+
+  return (
+    typeof passwordHash === 'string' &&
+    passwordHash.length > 0
+  );
 };
 
 userSchema.virtual('isActive').get(function isActiveVirtual(this: UserDocument): boolean {

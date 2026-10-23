@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from 'node:timers/promises';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Types } from 'mongoose';
 
@@ -34,9 +35,8 @@ beforeEach(async () => {
   analysis = await Analysis.request({ project, userId: owner._id });
 
   const foreignProj = await Project.createFor({ ownerId: user2._id, name: 'foreign', description: 'x' });
-  const foreign = await foreignProj
-      .connectRepository({ url: 'https://github.com/other/one' }, 'main')
-      .then((saved) => saved.markRepositoryVerified('main'));
+  let foreign = await foreignProj.connectRepository({ url: 'https://github.com/other/one' }, 'main');
+  foreign = await foreign.markRepositoryVerified('main');
   other = await Analysis.request({ project: foreign, userId: USER2_ID });
 });
 
@@ -56,7 +56,7 @@ describe('RecommendationRepository', () => {
         title: 'bump replicas',
         description: '3 -> 5',
       });
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await sleep(10);
       const second = await Recommendation.fromAi({
         analysisId: analysis._id,
         generatedBy: { provider: 'openai', model: 'gpt-5' },

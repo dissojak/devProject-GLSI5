@@ -85,12 +85,18 @@ describe('Deployment model', () => {
 
     it('rejects an unknown environment', async () => {
       await Deployment.deleteMany({});
-      const error = await Deployment.createFromPlan({
-        plan: makePlan(true),
-        user: USER_ID,
-        environment: 'UAT' as never,
-        gitops,
-      }).catch((caught: unknown) => caught);
+      const error = await (async () => {
+        try {
+          return await Deployment.createFromPlan({
+            plan: makePlan(true),
+            user: USER_ID,
+            environment: 'UAT' as never,
+            gitops,
+          });
+        } catch (caught: unknown) {
+          return caught;
+        }
+      })();
 
       expect(String((error as Error).message)).toMatch(/environment/);
     });

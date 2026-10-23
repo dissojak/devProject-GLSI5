@@ -22,6 +22,14 @@ const RawEnvSchema = z.object({
       (value) => /^[A-Za-z0-9+/]+={0,2}$/.test(value) && Buffer.from(value, 'base64').length === 32,
       'TOKEN_ENCRYPTION_KEY must be base64 that decodes to exactly 32 bytes (openssl rand -base64 32)',
     ),
+  GITHUB_CLIENT_ID: z.string().trim().min(1, 'GITHUB_CLIENT_ID is required'),
+  GITHUB_CLIENT_SECRET: z.string().trim().min(1, 'GITHUB_CLIENT_SECRET is required'),
+  GITHUB_CALLBACK_URL: z.string().trim().url('GITHUB_CALLBACK_URL must be a valid URL'),
+  FRONTEND_URL: z.string().trim().url('FRONTEND_URL must be a valid URL'),
+  SESSION_SECRET: z
+    .string()
+    .trim()
+    .min(32, 'SESSION_SECRET must be at least 32 bytes'),
 });
 
 export type Env = {
@@ -31,6 +39,11 @@ export type Env = {
   corsOrigins: string[];
   logLevel: (typeof ENV_LOG_LEVEL)[number];
   tokenEncryptionKey: Buffer;
+  githubClientId: string;
+  githubClientSecret: string;
+  githubCallbackUrl: string;
+  frontendUrl: string;
+  sessionSecret: string;
 };
 
 let cachedEnv: Env | undefined;
@@ -70,6 +83,11 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     corsOrigins: parseOrigins(parsed.data.CORS_ORIGINS),
     logLevel: parsed.data.LOG_LEVEL,
     tokenEncryptionKey: Buffer.from(parsed.data.TOKEN_ENCRYPTION_KEY, 'base64'),
+    githubClientId: parsed.data.GITHUB_CLIENT_ID,
+    githubClientSecret: parsed.data.GITHUB_CLIENT_SECRET,
+    githubCallbackUrl: parsed.data.GITHUB_CALLBACK_URL,
+    frontendUrl: parsed.data.FRONTEND_URL,
+    sessionSecret: parsed.data.SESSION_SECRET,
   };
 }
 

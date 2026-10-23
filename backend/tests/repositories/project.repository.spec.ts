@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from 'node:timers/promises';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Types } from 'mongoose';
 
@@ -28,7 +29,7 @@ beforeEach(async () => {
   projects = [];
   for (let i = 0; i < 3; i += 1) {
     projects.push(await Project.createFor({ ownerId: owner._id, name: `proj-${i}`, description: 'd' }));
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await sleep(10);
   }
 });
 
