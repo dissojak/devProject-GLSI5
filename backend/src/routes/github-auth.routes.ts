@@ -1,14 +1,21 @@
-import { Router, type RequestHandler } from 'express';
+import { Router } from 'express';
 
-export function createGithubAuthRouter(
-  start: RequestHandler,
-  callback: RequestHandler,
-): Router {
+import type { GithubAuthDeps } from '../controllers/github-auth.controller.js';
+import {
+  createGithubStartController,
+  createGithubCallbackController,
+} from '../controllers/github-auth.controller.js';
+
+/**
+ * HTTP wiring ONLY: paths + controllers created ON the route line.
+ * Dependencies arrive injected from routes/index.ts (the composition root).
+ */
+export function createGithubAuthRouter(deps: GithubAuthDeps): Router {
   const router = Router();
 
-  router.get('/github', start);
+  router.get('/github', createGithubStartController(deps));
 
-  router.get('/github/callback', callback);
+  router.get('/github/callback', createGithubCallbackController(deps));
 
   return router;
 }

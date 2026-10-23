@@ -1,4 +1,3 @@
-
 import {
   createHash,
   randomBytes,
@@ -7,11 +6,25 @@ import {
 
 import type { RequestHandler, Response } from 'express';
 
-import { GithubOAuthService } from '../services/auth/github-oauth.service.js';
-import { GithubAuthService } from '../services/auth/github-auth.service.js';
-import { SessionTokenService } from '../services/auth/session-token.service.js';
+import type { GithubOAuthService } from '../services/auth/github-oauth.service.js';
+import type { GithubAuthService } from '../services/auth/github-auth.service.js';
+import type { SessionTokenService } from '../services/auth/session-token.service.js';
 
 const OAUTH_MAX_AGE = 5 * 60 * 1000;
+
+/**
+ * One shared dependency bag for the GitHub OAuth feature. Built ONCE by
+ * routes/index.ts (the composition root) and passed to every controller
+ * factory below, so each route line can wire itself directly:
+ *   router.get('/github', createGithubStartController(deps));
+ */
+export interface GithubAuthDeps {
+  oauth: GithubOAuthService;
+  auth: GithubAuthService;
+  sessions: SessionTokenService;
+  frontendUrl: string;
+  secureCookies: boolean;
+}
 
 function equalState(a: string, b: string): boolean {
   const x = Buffer.from(a);
@@ -20,14 +33,8 @@ function equalState(a: string, b: string): boolean {
   return x.length === y.length && timingSafeEqual(x, y);
 }
 
-export function createGithubAuthController(
-  oauth: GithubOAuthService,
-  auth: GithubAuthService,
-  sessions: SessionTokenService,
-  frontendUrl: string,
-  secureCookies: boolean,
-) {
-  const oauthCookieOptions = {
+function oauthCookieOptions(secureCookies: boolean) {
+  return {
     httpOnly: true,
     secure: secureCookies,
     sameSite: 'lax' as const,
@@ -35,20 +42,48 @@ export function createGithubAuthController(
     path: '/api/v1/auth/github',
     maxAge: OAUTH_MAX_AGE,
   };
+}
 
-  function clearOAuthCookies(res: Response): void {
-    const options = {
-      httpOnly: true,
-      secure: secureCookies,
-      sameSite: 'lax' as const,
-      path: '/api/v1/auth/github',
-    };
+function clearOAuthCookies(res: Response, secureCookies: boolean): void {
+  const options = {
+    httpOnly: true,
+    secure: secureCookies,
+    sameSite: 'lax' as const,
+    path: '/api/v1/auth/github',
+  };
 
-    res.clearCookie('oauth_state', options);
-    res.clearCookie('oauth_verifier', options);
-  }
+  res.clearCookie('oauth_state', options);
+  res.clearCookie('oauth_verifier', options);
+}
 
-  const start: RequestHandler = (_req, res) => {
+interface OAuthCallbackData {
+  code: string;
+  verifier: string;
+}
+
+function getOAuthCallbackData(
+  state: unknown,
+  code: unknown,
+  savedState: unknown,
+  verifier: unknown,
+): OAuthCallbackData | null {
+  if (typeof state !== 'string') return null;
+  if (typeof code !== 'string') return null;
+  if (typeof savedState !== 'string') return null;
+  if (typeof verifier !== 'string') return null;
+  if (!equalState(state, savedState)) return null;
+
+  return { code, verifier };
+}
+
+/**
+ * Factories take the deps bag and return route-ready handlers; service
+ * contract TYPES come straight from each service file (source of truth).
+ */
+export function createGithubStartController(
+  deps: GithubAuthDeps,
+): RequestHandler {
+  return (_req, res) => {
     const state = randomBytes(32).toString('base64url');
     const verifier = randomBytes(32).toString('base64url');
 
@@ -56,13 +91,17 @@ export function createGithubAuthController(
       .update(verifier)
       .digest('base64url');
 
-    res.cookie('oauth_state', state, oauthCookieOptions);
-    res.cookie('oauth_verifier', verifier, oauthCookieOptions);
+    res.cookie('oauth_state', state, oauthCookieOptions(deps.secureCookies));
+    res.cookie('oauth_verifier', verifier, oauthCookieOptions(deps.secureCookies));
 
-    res.redirect(oauth.getAuthorizationUrl(state, challenge));
+    res.redirect(deps.oauth.getAuthorizationUrl(state, challenge));
   };
+}
 
-  const callback: RequestHandler = async (req, res) => {
+export function createGithubCallbackController(
+  deps: GithubAuthDeps,
+): RequestHandler {
+  return async (req, res) => {
     const state = req.query.state;
     const code = req.query.code;
 
@@ -72,15 +111,16 @@ export function createGithubAuthController(
     const verifier: unknown =
       req.signedCookies?.oauth_verifier;
 
-    clearOAuthCookies(res);
+    clearOAuthCookies(res, deps.secureCookies);
 
-    if (
-      typeof state !== 'string' ||
-      typeof code !== 'string' ||
-      typeof savedState !== 'string' ||
-      typeof verifier !== 'string' ||
-      !equalState(state, savedState)
-    ) {
+    const callbackData = getOAuthCallbackData(
+      state,
+      code,
+      savedState,
+      verifier,
+    );
+
+    if (callbackData === null) {
       res.status(400).json({
         error: {
           code: 'VALIDATION_ERROR',
@@ -90,30 +130,23 @@ export function createGithubAuthController(
       return;
     }
 
-    const profile = await oauth.getProfile(code, verifier);
+    const profile = await deps.oauth.getProfile(
+      callbackData.code,
+      callbackData.verifier,
+    );
 
-    const user = await auth.login(profile);
+    const user = await deps.auth.login(profile);
 
-    const token = await sessions.create(user.id);
+    const token = await deps.sessions.create(user.id);
 
     res.cookie('session', token, {
       httpOnly: true,
-      secure: secureCookies,
+      secure: deps.secureCookies,
       sameSite: 'lax',
       path: '/',
       maxAge: 60 * 60 * 1000,
     });
 
-  res.status(200).json({
-  message: 'GitHub authentication successful',
-  data: {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    role: user.role,
-    },
-    });
-};
-
-  return { start, callback };
+    res.redirect(deps.frontendUrl);
+  };
 }
