@@ -125,7 +125,14 @@ describe('DeploymentPlan model', () => {
       });
       // Embedded subschema pre('validate') hooks run only through the async
       // Document.validate() path (the deprecated validateSync skips nested hooks).
-      const error = await doc.validate().catch((caught: unknown) => caught);
+      const error = await (async () => {
+        try {
+          await doc.validate();
+          return undefined;
+        } catch (caught: unknown) {
+          return caught;
+        }
+      })();
       const keys = Object.keys((error as { errors?: Record<string, unknown> })?.errors ?? {});
       expect(keys.some((key) => key.includes('components.0'))).toBe(true);
     });

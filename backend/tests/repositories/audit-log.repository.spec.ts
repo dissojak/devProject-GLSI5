@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from 'node:timers/promises';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Types } from 'mongoose';
 
@@ -34,7 +35,7 @@ describe('AuditLogRepository', () => {
         action: 'PROJECT_CREATED',
         entity: { type: 'Project', id: PROJECT_ID },
       });
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await sleep(10);
       await AuditLog.record({
         actor: USER_ID,
         action: 'PROJECT_UPDATED',
@@ -75,7 +76,7 @@ describe('AuditLogRepository', () => {
         entity: { type: 'WorkflowRun', id: PROJECT_ID },
         error: { code: 'E_FAIL', message: 'runner crashed' },
       });
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await sleep(10);
       await AuditLog.record({
         action: 'DEPLOYMENT_FAILED',
         level: 'WARN',

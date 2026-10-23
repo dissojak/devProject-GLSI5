@@ -92,13 +92,19 @@ describe('GeneratedFile model', () => {
         ['K8S_DEPLOYMENT', 'plan'],
         ['GITHUB_WORKFLOW', 'plan version'],
       ] as const) {
-        const error = await GeneratedFile.generate({
-          projectId: PROJECT_ID,
-          kind,
-          fileName: 'file.yaml',
-          path: 'k8s/file.yaml',
-          content: 'yaml: true',
-        }).catch((caught: unknown) => caught);
+        const error = await (async () => {
+          try {
+            return await GeneratedFile.generate({
+              projectId: PROJECT_ID,
+              kind,
+              fileName: 'file.yaml',
+              path: 'k8s/file.yaml',
+              content: 'yaml: true',
+            });
+          } catch (caught: unknown) {
+            return caught;
+          }
+        })();
 
         expect(String((error as { message?: string }).message ?? '')).toMatch(
           new RegExp(errorSubstring.replace(' ', '\\s+') + '|required|needs', 'i'),
@@ -128,13 +134,19 @@ describe('GeneratedFile model', () => {
     });
 
     it('DOCKERFILE without plan or analysis is rejected', async () => {
-      const error = await GeneratedFile.generate({
-        projectId: PROJECT_ID,
-        kind: 'DOCKERFILE',
-        fileName: 'Dockerfile',
-        path: 'Dockerfile',
-        content: DOCKERFILE_CONTENT,
-      }).catch((caught: unknown) => caught);
+      const error = await (async () => {
+        try {
+          return await GeneratedFile.generate({
+            projectId: PROJECT_ID,
+            kind: 'DOCKERFILE',
+            fileName: 'Dockerfile',
+            path: 'Dockerfile',
+            content: DOCKERFILE_CONTENT,
+          });
+        } catch (caught: unknown) {
+          return caught;
+        }
+      })();
 
       expect(String((error as { message?: string }).message ?? '')).toMatch(/DOCKERFILE/i);
     });

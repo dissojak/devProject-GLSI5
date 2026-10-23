@@ -6,9 +6,13 @@ import type { Document } from 'mongoose';
  * the rejected ValidationError. An empty array means the document validated.
  */
 export async function validatedErrorPaths(doc: Document): Promise<string[]> {
-  const rejection = await doc.validate().then(
-    () => undefined,
-    (rejected: { errors?: Record<string, unknown> }) => rejected,
-  );
+  let rejection: { errors?: Record<string, unknown> } | undefined;
+
+  try {
+    await doc.validate();
+  } catch (e: unknown) {
+    rejection = e as { errors?: Record<string, unknown> };
+  }
+
   return Object.keys(rejection?.errors ?? {});
 }
