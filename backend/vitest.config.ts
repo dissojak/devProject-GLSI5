@@ -1,4 +1,16 @@
 import { defineConfig } from 'vitest/config';
+import { existsSync } from 'node:fs';
+import process from 'node:process';
+
+// Load real values from .env (same source as the dev script) so no secrets
+// are ever hardcoded in version control. Tests never connect to MONGODB_URI:
+// integration tests spin up their own mongodb-memory-server instance.
+if (existsSync('.env')) {
+  process.loadEnvFile();
+}
+
+// Tests must behave like tests even if .env says otherwise.
+process.env.NODE_ENV = 'test';
 
 export default defineConfig({
   test: {
@@ -7,17 +19,5 @@ export default defineConfig({
     // First-ever run downloads the MongoDB testing binary; keep hooks patient.
     hookTimeout: 120_000,
     testTimeout: 60_000,
-    // Seed a VALID environment before any import runs, so `config/env` passes
-    // validation in tests. A local mongodb-memory-server instance provides the
-    // real database in integration tests; this value is never connected to.
-    env: {
-      NODE_ENV: 'test',
-      PORT: '4000',
-      MONGODB_URI: 'mongodb+srv://dissojak:stoondissojakb2a@stoon.r8tcyqv.mongodb.net/ARTIFEX-For-PFE?retryWrites=true&w=majority',
-      CORS_ORIGINS: 'http://localhost:3000',
-      LOG_LEVEL: 'warn',
-      // Dummy 32-byte base64 value for tests only (not a secret).
-      TOKEN_ENCRYPTION_KEY: 'RtcY2OnO4aHlOr8T+s1IMgJeDXqAtkOLEd5FIqTt45o=',
-    },
   },
 });
