@@ -14,7 +14,8 @@ src/
   repositories/    one file per repository + barrel; BaseRepository lives here
   services/        orchestration: cross-document rules, transactions, audit
   controllers/     HTTP layer: parse/validate input, call services, map to DTOs
-  routes/          Express routing per resource
+  routes/          Express routing per resource + per-feature composition
+                   (builds services/controllers, declares paths)
   middleware/      request logging, 404, central error handler + status table
   shared/          crypto/, logging/, security/ (multi-layer helpers)
 tests/
@@ -35,8 +36,84 @@ shared/*      importable by all layers; shared imports domain only
 ```
 
 Forbidden: models importing repositories/services; repositories importing
-services/controllers; `src/config/env` leaking beyond the entry points
-(`server.ts`, `app.ts`, test helpers).
+services/controllers; `src/config/env` beyond the composition roots
+(`server.ts`, `app.ts`, `routes/index.ts`, test helpers); `app.ts` importing
+anything below `routes/` except `routes/index.ts`; locally redeclaring a
+type that already exists in `src/types/` (see "Types & contracts").
+
+## Types & contracts — extraction criterion (strict)
+
+Types are centralized ONLY when they are genuinely reused across layers.
+Importing a type is NOT duplication — only REDECLARING one is. So:
+
+```
+src/types/          pure types reused by 2+ layers ONLY (nothing executes)
+  auth.types.ts     AuthUser (every auth/user endpoint echoes it — sure reuse)
+  github.types.ts   GithubProfile (OAuth service produces it, auth service consumes it)
+  index.ts          barrel ('src/types/index.js')
+```
+
+- **Module-local shapes NEVER move here.** Each service derives its own
+  contract at source, zero duplication, zero drift:
+  ```ts
+  export type AuthService = ReturnType<typeof createAuthService>;
+  export type SessionTokenService = ReturnType<typeof createSessionTokenService>;
+  ```
+- **Feature-local wiring bags** (e.g. `GithubAuthDeps`) live next to their
+  primary consumer (the controller file whose factories take it).
+- **zod-derived inputs** (`RegisterInput`, `LoginInput`) are `z.infer`
+  exports of the schema files (`services/auth/*.schema.ts`) — their only
+  source; never re-infer them by hand.
+- NEVER copy/redeclare a type in a second file — import it from wherever
+  lives its single source (the barrel above or the owning module).
+- `src/types/` stays type-only (zod-inferred types are the sanctioned
+  exception). Extracting a type nobody reuses is indirection with zero
+  payoff — don't.
+
+## Composition (who builds what) — enforced like the dependency direction
+
+The reference pattern (Artifex backend): `app.js` imports ONLY routes
+(`app.use("/api/user", user)`). Applied here, in three levels:
+
+1. **`app.ts`** is the GLOBAL bootstrap: express app, global middleware
+   (logging, helmet, cors, json, cookies), the 404/error handlers, ONE
+   mounted router (`app.use('/api/v1', createApiRouter())`), health and
+   swagger. It must NEVER import services, repositories or controllers.
+2. **`routes/index.ts` is THE composition root** (the ONLY file below
+   `app.ts/server.ts` allowed to import repositories and call `getEnv()` —
+   eslint turns every other rule off JUST for this file):
+   - it builds EVERY repository here (`new UserRepository()` …), once;
+   - it builds every service via the functional factories;
+   - it calls each feature router factory, passing the dependencies as
+     arguments (`createAuthRouter(authService)`, `createGithubAuthRouter(deps)`).
+3. **`routes/<feature>.routes.ts`** is pure HTTP wiring: NO dependency is
+   built there. Controllers are created **ON the route line**:
+   ```
+   router.post('/register', createRegisterController(authService));
+   router.post('/login', createLoginController(authService));
+   ```
+   Never a detached variable then re-attach — one line per endpoint.
+   **Incoming-request control (validation, guards, per-route middleware)
+   is expressed directly on that same route line**, Artifex-style:
+   `router.get('/getUser', MW.protect, UC.getUserProfile)`. That chain is
+   where things coming from the frontend are enforced — controllers stay
+   thin. Routes still contain NO business logic and NO data access.
+4. **Services are FUNCTIONAL factories, not classes** (no `class`, no
+   `this`, no DI-container vibe):
+   ```
+   export function createAuthService(
+     users: UserRepository = new UserRepository(),
+   ): AuthService { ... return { register, login }; }
+   ```
+   The dependency arrives as a PARAMETER and default-wires itself, so:
+   `routes/index.ts` passes repositories explicitly (`createAuthService(users)`)
+   while tests wrap fakes with zero ceremony. Services never read
+   `config/` — env values arrive as arguments.
+5. **Controllers** are factories taking their deps (`AuthService` from its
+   service file, `GithubAuthDeps` declared in its own controller file) and
+   returning `RequestHandler`s — every type has ONE source (see "Types &
+   contracts" for what belongs in `src/types/` vs. its own module) and
+   controllers stay `config/`-free.
 
 Operational exception (`GET /health`): must respond even when the rest of the
 app is broken, so it bypasses services. The route wires
@@ -70,7 +147,18 @@ This is the only endpoint allowed to skip the services layer.
    `connectTestingModule('<name>_test')`. Purge between tests with
    `deleteMany({}).setOptions({ withDeleted: true })` (append-only models:
    driver-level `collection.deleteMany`).
-5. Run `npm run build && npm run typecheck && npm run lint && npm test`.
+ 5. Run `npm run build && npm run typecheck && npm run lint && npm test`.
+
+## Complexity budget (CodeScene "Complex Method", cc ≤ 9)
+
+A function or method that mixes its STEPS with all their branching goes over
+the complexity budget fast (cc = 10 flags it red). The fix is always the
+same: extract each step into a small named function and keep the orchestrator
+a flat sequence of steps. Example: `getProfile` reads
+`exchangeCodeForToken → fetchProfileAndEmails → verifiedPrimaryEmail` —
+`fetchGithubJson` centralizes the single "response.ok branch" so no caller
+re-branches on it. A step function does ONE thing; a flow function does NO
+branching it can delegate.
 
 ## Indexes
 
@@ -101,6 +189,25 @@ This is the only endpoint allowed to skip the services layer.
 - Resting on the current state (`from === to`) is NOT a valid transition.
 - The single transition error message contract:
   `Invalid state transition: cannot move from "X" to "Y"`.
+
+## Async contract (async/await ONLY — no promise chains)
+
+- **Every async code path is written `async`/`await`** — `.then(...)` and
+  `.catch((caught) => caught)` chains are BANNED in `src/` AND `tests/`
+  (grep is the enforcement: `\.then(|\.catch(|new Promise` must return
+  nothing but the callback URL constants and `timers/promises` imports).
+- When a test needs a THROWN error as a value, use an awaited block with an
+  explicit `try/catch` (see `tests/helpers/schema-validation.ts`); when a
+  flow must not crash the process, wrap it in one awaited bootstrap with a
+  single `try/catch` (see `src/server.ts`, `src/scripts/*.ts`).
+- Plain sleeps in tests use the platform primitive:
+  `import { setTimeout as sleep } from 'node:timers/promises'; await sleep(10);`
+  — never `new Promise((resolve) => setTimeout(resolve, ms))`.
+- `await Promise.all([...])` stays (it IS async/await-friendly) for
+  independent parallel work.
+- Model/service functions rely on awaits only — behaviors never use
+  callbacks or `.then` — so bugs surface as rejected promise rejections at
+  ONE awaited boundary (controller → central error handler).
 
 ## Error handling contract
 
@@ -171,3 +278,21 @@ This is the only endpoint allowed to skip the services layer.
 - **Serde contract**: request bodies are plain JSON (camelCase), error and
   pagination envelopes as documented in `middleware/error-handler.ts` and the
   pagination helper — adding a route never invents a fourth envelope shape.
+
+## Zod rules (v4 — deprecated APIs banned, enforced by ESLint `no-restricted-properties`)
+
+The project runs zod 4. The migration-era shims are deprecated here — use
+the v4-native functions:
+
+| BANNED (eslint error) | Use instead |
+|---|---|
+| `result.error.flatten()` | `z.flattenError(result.error)` |
+| `result.error.format()` | `z.treeifyError(result.error)` |
+| `z.object({...}).strict()` | `z.strictObject({...})` |
+| `z.object({...}).nonstrict()` | `z.looseObject({...})` |
+
+`VALIDATION_ERROR` payloads keep the same flattening shape —
+`z.flattenError()` returns the identical structure (the envelope contract
+above is unaffected). Keep zod usage central: schemas live in
+`services/<feature>/*.schema.ts`, request validation only in controllers,
+and env parsing only in `config/env.ts`.
