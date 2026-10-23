@@ -135,9 +135,13 @@ const isEntry =
   (import.meta.url === `file://${process.argv[1]}` ||
     import.meta.url.endsWith(process.argv[1]));
 if (isEntry === true) {
-  main().catch((error: unknown) => {
-    const crashLogger = createLogger(getEnv().logLevel, { sync: true });
-    crashLogger.error({ error: error instanceof Error ? error.message : String(error) }, 'db:sync-indexes crashed');
-    process.exit(1);
-  });
+  void (async (): Promise<void> => {
+    try {
+      await main();
+    } catch (error: unknown) {
+      const crashLogger = createLogger(getEnv().logLevel, { sync: true });
+      crashLogger.error({ error: error instanceof Error ? error.message : String(error) }, 'db:sync-indexes crashed');
+      process.exit(1);
+    }
+  })();
 }

@@ -1,3 +1,4 @@
+/* eslint-disable no-console -- CLI script: stdout/stderr IS the output */
 
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
@@ -49,9 +50,13 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error: unknown) => {
-  console.error(
-    error instanceof Error ? error.message : String(error),
-  );
-  process.exitCode = 1;
-});
+void (async (): Promise<void> => {
+  try {
+    await main();
+  } catch (error: unknown) {
+    console.error(
+      error instanceof Error ? error.message : String(error),
+    );
+    process.exitCode = 1;
+  }
+})();
