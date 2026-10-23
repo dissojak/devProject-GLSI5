@@ -1,21 +1,10 @@
-import { ConflictError } from '../../domain/errors/index.js';
-import { User, type UserDocument } from '../../models/entities/index.js';
+import { ConflictError, UnauthorizedError } from '../../domain/errors/index.js';
+import { User } from '../../models/entities/index.js';
+import type { UserDocument } from '../../models/entities/index.js';
 import { UserRepository } from '../../repositories/user.repository.js';
 import type { RegisterInput } from './register.schema.js';
-import { UnauthorizedError } from '../../domain/errors/index.js';
 import type { LoginInput } from './login.schema.js';
-
-export interface AuthUser {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-}
-
-export interface AuthServiceContract {
-  register(input: RegisterInput): Promise<AuthUser>;
-  login(input: LoginInput): Promise<AuthUser>;
-}
+import type { AuthUser } from '../../types/index.js';
 
 function toAuthUser(user: UserDocument): AuthUser {
   return {
@@ -26,13 +15,18 @@ function toAuthUser(user: UserDocument): AuthUser {
   };
 }
 
-export class AuthService implements AuthServiceContract {
-  constructor(
-    private readonly users: UserRepository,
-  ) {}
-
-  async register(input: RegisterInput): Promise<AuthUser> {
-    const existing = await this.users.findByEmail(
+/**
+ * Functional service factory (see docs/conventions.md, "Services").
+ * Plain closures - never classes. Dependencies arrive as parameters and
+ * default-wire themselves, so:
+ *   - routes/index.ts calls createAuthService(new UserRepository()) (explicit),
+ *   - tests call createAuthService() or inject a fake.
+ */
+export function createAuthService(
+  users: UserRepository = new UserRepository(),
+) {
+  async function register(input: RegisterInput): Promise<AuthUser> {
+    const existing = await users.findByEmail(
       input.email,
       { withDeleted: true },
     );
@@ -63,30 +57,37 @@ export class AuthService implements AuthServiceContract {
     }
   }
 
-async login(input: LoginInput): Promise<AuthUser> {
-  const user = await this.users.findForAuthentication(input.email);
+  async function login(input: LoginInput): Promise<AuthUser> {
+    const user = await users.findForAuthentication(input.email);
 
-  if (!user) {
-    throw new UnauthorizedError(
-      'Invalid email or password',
-    );
+    if (!user) {
+      throw new UnauthorizedError(
+        'Invalid email or password',
+      );
+    }
+    user.assertCanAuthenticate();
+    const isValid = await user.verifyPassword(input.password);
+
+    if (!isValid) {
+      throw new UnauthorizedError(
+        'Invalid email or password',
+      );
+    }
+
+    await user.recordLogin();
+
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    };
   }
-  user.assertCanAuthenticate();
-  const isValid = await user.verifyPassword(input.password);
 
-  if (!isValid) {
-    throw new UnauthorizedError(
-      'Invalid email or password',
-    );
-  }
-
-  await user.recordLogin();
-
-  return {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    role: user.role,
-  };
+  return { register, login };
 }
-}
+
+/**
+ * Service contract, derived at its SOURCE — never redeclared elsewhere.
+ */
+export type AuthService = ReturnType<typeof createAuthService>;

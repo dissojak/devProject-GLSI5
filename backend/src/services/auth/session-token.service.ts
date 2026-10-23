@@ -1,18 +1,19 @@
-
 import { SignJWT, jwtVerify } from 'jose';
 
-export class SessionTokenService {
-  private readonly key: Uint8Array;
+/**
+ * Functional service factory (docs/conventions.md, "Services"). The secret is
+ * injected by the composition root (routes/index.ts), never read from config.
+ */
+export function createSessionTokenService(
+  secret: string,
+) {
+  const key = new TextEncoder().encode(secret);
 
-  constructor(secret: string) {
-    this.key = new TextEncoder().encode(secret);
-
-    if (this.key.length < 32) {
-      throw new Error('SESSION_SECRET must be at least 32 bytes');
-    }
+  if (key.length < 32) {
+    throw new Error('SESSION_SECRET must be at least 32 bytes');
   }
 
-  async create(userId: string): Promise<string> {
+  async function create(userId: string): Promise<string> {
     return new SignJWT({})
       .setProtectedHeader({ alg: 'HS256' })
       .setSubject(userId)
@@ -20,11 +21,11 @@ export class SessionTokenService {
       .setAudience('deploymentplanner-web')
       .setIssuedAt()
       .setExpirationTime('1h')
-      .sign(this.key);
+      .sign(key);
   }
 
-  async verify(token: string): Promise<string> {
-    const { payload } = await jwtVerify(token, this.key, {
+  async function verify(token: string): Promise<string> {
+    const { payload } = await jwtVerify(token, key, {
       issuer: 'deploymentplanner-ai',
       audience: 'deploymentplanner-web',
       algorithms: ['HS256'],
@@ -36,4 +37,11 @@ export class SessionTokenService {
 
     return payload.sub;
   }
+
+  return { create, verify };
 }
+
+/**
+ * Service contract, derived at its SOURCE - never redeclared elsewhere.
+ */
+export type SessionTokenService = ReturnType<typeof createSessionTokenService>;

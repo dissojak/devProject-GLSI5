@@ -1,5 +1,6 @@
-
 import { z } from 'zod';
+
+import type { GithubProfile } from '../../types/index.js';
 
 const tokenSchema = z.object({
   access_token: z.string().min(1),
@@ -17,29 +18,50 @@ const emailSchema = z.array(z.object({
   verified: z.boolean(),
 }));
 
-export interface GithubProfile {
-  githubId: string;
-  name: string;
-  email: string;
+const GITHUB_TIMEOUT_MS = 10_000;
+
+/**
+ * Fetch + check + zod-parse in ONE step, so no caller mixes branching with
+ * business flow (keeps each function's complexity low - the CodeScene
+ * "Complex Method" rule).
+ */
+function fetchGithubJson<T>(
+  url: string,
+  init: RequestInit,
+  schema: z.ZodType<T>,
+  failMessage: string,
+): Promise<T> {
+  return (async () => {
+    const response = await fetch(url, {
+      ...init,
+      signal: AbortSignal.timeout(GITHUB_TIMEOUT_MS),
+    });
+
+    if (!response.ok) {
+      throw new Error(failMessage);
+    }
+
+    return schema.parse(await response.json());
+  })();
 }
 
-export class GithubOAuthService {
-  constructor(
-    private readonly clientId: string,
-    private readonly clientSecret: string,
-    private readonly callbackUrl: string,
-  ) {}
-
-  getAuthorizationUrl(
+/**
+ * Functional service factory (docs/conventions.md, "Services"). Values are
+ * frozen at creation time - no config read, no class, no `this`.
+ */
+export function createGithubOAuthService(
+  clientId: string,
+  clientSecret: string,
+  callbackUrl: string,
+) {
+  function getAuthorizationUrl(
     state: string,
     challenge: string,
   ): string {
-    const url = new URL(
-      'https://github.com/login/oauth/authorize',
-    );
+    const url = new URL('https://github.com/login/oauth/authorize');
 
-    url.searchParams.set('client_id', this.clientId);
-    url.searchParams.set('redirect_uri', this.callbackUrl);
+    url.searchParams.set('client_id', clientId);
+    url.searchParams.set('redirect_uri', callbackUrl);
     url.searchParams.set('scope', 'read:user user:email');
     url.searchParams.set('state', state);
     url.searchParams.set('code_challenge', challenge);
@@ -48,11 +70,19 @@ export class GithubOAuthService {
     return url.toString();
   }
 
-  async getProfile(
+  function apiHeaders(accessToken: string): Record<string, string> {
+    return {
+      Accept: 'application/vnd.github+json',
+      Authorization: `Bearer ${accessToken}`,
+    };
+  }
+
+  /** Step 1: OAuth code -> access token. */
+  async function exchangeCodeForToken(
     code: string,
     verifier: string,
-  ): Promise<GithubProfile> {
-    const tokenResponse = await fetch(
+  ): Promise<string> {
+    const token = await fetchGithubJson(
       'https://github.com/login/oauth/access_token',
       {
         method: 'POST',
@@ -61,64 +91,69 @@ export class GithubOAuthService {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          client_id: this.clientId,
-          client_secret: this.clientSecret,
-          redirect_uri: this.callbackUrl,
+          client_id: clientId,
+          client_secret: clientSecret,
+          redirect_uri: callbackUrl,
           code,
           code_verifier: verifier,
         }),
-        signal: AbortSignal.timeout(10000),
       },
+      tokenSchema,
+      'GitHub token exchange failed',
     );
 
-    if (!tokenResponse.ok) {
-      throw new Error('GitHub token exchange failed');
-    }
+    return token.access_token;
+  }
 
-    const token = tokenSchema.parse(
-      await tokenResponse.json(),
-    );
-
-    const headers = {
-      Accept: 'application/vnd.github+json',
-      Authorization: `Bearer ${token.access_token}`,
-    };
-
-    const [userResponse, emailResponse] = await Promise.all([
-      fetch('https://api.github.com/user', {
-        headers,
-        signal: AbortSignal.timeout(10000),
-      }),
-      fetch('https://api.github.com/user/emails', {
-        headers,
-        signal: AbortSignal.timeout(10000),
-      }),
+  /** Step 2: access token -> (profile, emails), in parallel. */
+  async function fetchProfileAndEmails(accessToken: string) {
+    return Promise.all([
+      fetchGithubJson(
+        'https://api.github.com/user',
+        { headers: apiHeaders(accessToken) },
+        profileSchema,
+        'GitHub profile retrieval failed',
+      ),
+      fetchGithubJson(
+        'https://api.github.com/user/emails',
+        { headers: apiHeaders(accessToken) },
+        emailSchema,
+        'GitHub profile retrieval failed',
+      ),
     ]);
+  }
 
-    if (!userResponse.ok || !emailResponse.ok) {
-      throw new Error('GitHub profile retrieval failed');
-    }
-
-    const user = profileSchema.parse(
-      await userResponse.json(),
-    );
-
-    const emails = emailSchema.parse(
-      await emailResponse.json(),
-    );
-
-    const primary = emails.find(
-      (item) => item.primary && item.verified,
-    );
+  /** Step 3: identity picks its verified primary email. */
+  function verifiedPrimaryEmail(emails: z.infer<typeof emailSchema>): string {
+    const primary = emails.find((item) => item.primary && item.verified);
 
     if (!primary) {
       throw new Error('Verified primary email required');
     }
 
+    return primary.email.toLowerCase();
+  }
+
+  async function getProfile(
+    code: string,
+    verifier: string,
+  ): Promise<GithubProfile> {
+    const accessToken = await exchangeCodeForToken(code, verifier);
+
+    const [user, emails] = await fetchProfileAndEmails(accessToken);
+
     return {
       githubId: String(user.id),
       name: user.name || user.login,
-      email: primary.email.toLowerCase(),
+      email: verifiedPrimaryEmail(emails),
     };
   }
+
+  return { getAuthorizationUrl, getProfile };
 }
+
+/**
+ * Service contract, derived at its SOURCE (docs/conventions.md, "Types &
+ * contracts") - never redeclared elsewhere; GithubProfile comes from src/types.
+ */
+export type GithubOAuthService = ReturnType<typeof createGithubOAuthService>;

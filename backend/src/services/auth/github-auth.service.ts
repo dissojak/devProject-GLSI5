@@ -4,25 +4,27 @@ import {
   UnauthorizedError,
 } from '../../domain/errors/index.js';
 
-import {type UserDocument,} from '../../models/entities/index.js';
-import {  UserRepository } from '../../repositories/user.repository.js';
+import type { UserDocument } from '../../models/entities/index.js';
+import { UserRepository } from '../../repositories/user.repository.js';
 import { AuthIdentityRepository } from '../../repositories/auth-identity.repository.js';
 
-import type { GithubProfile } from './github-oauth.service.js';
+import type { GithubProfile } from '../../types/index.js';
 
-export class GithubAuthService {
-  constructor(
-    private readonly users: UserRepository,
-    private readonly identities: AuthIdentityRepository,
-  ) {}
-
-  async login(profile: GithubProfile): Promise<UserDocument> {
-    const identity = await this.identities.findGithubIdentity(
+/**
+ * Functional service factory (docs/conventions.md, "Services"). Same rule as
+ * every service: closures, dependencies as parameters, default-wired values.
+ */
+export function createGithubAuthService(
+  users: UserRepository = new UserRepository(),
+  identities: AuthIdentityRepository = new AuthIdentityRepository(),
+) {
+  async function login(profile: GithubProfile): Promise<UserDocument> {
+    const identity = await identities.findGithubIdentity(
       profile.githubId,
     );
 
     if (identity) {
-      const user = await this.users.findById(
+      const user = await users.findById(
         identity.userId,
         { withDeleted: true },
       );
@@ -37,7 +39,7 @@ export class GithubAuthService {
       return user;
     }
 
-    const existingUser = await this.users.findByEmail(
+    const existingUser = await users.findByEmail(
       profile.email,
       { withDeleted: true },
     );
@@ -49,9 +51,9 @@ export class GithubAuthService {
     }
 
     let createdUser: UserDocument | undefined;
-    
+
     await mongoose.connection.transaction(async (session) => {
-      const user = await this.users.create(
+      const user = await users.create(
         {
           name: profile.name,
           email: profile.email,
@@ -60,7 +62,7 @@ export class GithubAuthService {
         { session },
       );
 
-      await this.identities.createGithubIdentity(
+      await identities.createGithubIdentity(
         user._id,
         profile.githubId,
         session,
@@ -75,4 +77,11 @@ export class GithubAuthService {
 
     return createdUser;
   }
+
+  return { login };
 }
+
+/**
+ * Service contract, derived at its SOURCE - never redeclared elsewhere.
+ */
+export type GithubAuthService = ReturnType<typeof createGithubAuthService>;
