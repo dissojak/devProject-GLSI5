@@ -1,22 +1,25 @@
 
 import type { RequestHandler } from 'express';
+import { z } from 'zod';
 
 import { AppError } from '../domain/errors/index.js';
-import type { AuthServiceContract } from '../services/auth/auth.service.js';
+import type { AuthService } from '../services/auth/auth.service.js';
 import { registerSchema } from '../services/auth/register.schema.js';
 import { loginSchema } from '../services/auth/login.schema.js';
 
 export function createRegisterController(
-  authService: AuthServiceContract,
+  authService: AuthService,
 ): RequestHandler {
   return async (req, res) => {
     const result = registerSchema.safeParse(req.body);
 
     if (!result.success) {
+      // z.flattenError(): zod 4 replacement for the deprecated
+      // result.error.flatten() (see docs/conventions.md, "Zod rules (v4)").
       throw new AppError(
         'VALIDATION_ERROR',
         'Invalid registration data',
-        result.error.flatten(),
+        z.flattenError(result.error),
       );
     }
 
@@ -30,7 +33,7 @@ export function createRegisterController(
 }
 
 export function createLoginController(
-  authService: AuthServiceContract,
+  authService: AuthService,
 ): RequestHandler {
   return async (req, res) => {
     const result = loginSchema.safeParse(req.body);
@@ -39,7 +42,7 @@ export function createLoginController(
       throw new AppError(
         'VALIDATION_ERROR',
         'Invalid login data',
-        result.error.flatten(),
+        z.flattenError(result.error),
       );
     }
 
@@ -51,4 +54,3 @@ export function createLoginController(
     });
   };
 }
-
