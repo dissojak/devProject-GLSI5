@@ -1,0 +1,73 @@
+
+import type { RequestHandler } from 'express';
+
+import { z } from 'zod';
+
+import {
+  AppError,
+} from '../domain/errors/index.js';
+
+import type {
+  UserApprovalService,
+} from '../services/users/user-approval.service.js';
+
+const idSchema = z.strictObject({
+  id: z.string().regex(/^[a-fA-F0-9]{24}$/),
+});
+
+function readId(params: unknown): string {
+  const result = idSchema.safeParse(params);
+
+  if (!result.success) {
+    throw new AppError(
+      'VALIDATION_ERROR',
+      'Invalid user ID',
+      z.flattenError(result.error),
+    );
+  }
+
+  return result.data.id;
+}
+
+export function createListPendingController(
+  service: UserApprovalService,
+): RequestHandler {
+  return async (_req, res) => {
+    const users = await service.listPending();
+
+    res.status(200).json({
+      message: 'Pending registrations',
+      data: users,
+    });
+  };
+}
+
+export function createApproveUserController(
+  service: UserApprovalService,
+): RequestHandler {
+  return async (req, res) => {
+    const id = readId(req.params);
+
+    const user = await service.approveUser(id);
+
+    res.status(200).json({
+      message: 'User approved successfully',
+      data: user,
+    });
+  };
+}
+
+export function createRejectUserController(
+  service: UserApprovalService,
+): RequestHandler {
+  return async (req, res) => {
+    const id = readId(req.params);
+
+    const user = await service.rejectUser(id);
+
+    res.status(200).json({
+      message: 'User registration rejected',
+      data: user,
+    });
+  };
+}

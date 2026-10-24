@@ -9,6 +9,10 @@ import {
   type RepositoryOptions,
 } from './base.repository.js';
 
+import type {
+  AccountStatus,
+} from '../domain/enums/account-status.enums.js';
+
 export interface UserSearch {
   q?: string;
   role?: UserRole;
@@ -60,6 +64,11 @@ async findForAuthentication(
     .select('+passwordHash');
 
   return await query.exec();
+}
+async findByStatus(
+  status: AccountStatus,
+): Promise<UserDocument[]> {
+  return this.find({ status });
 }
 
 }
