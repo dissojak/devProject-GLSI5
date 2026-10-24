@@ -37,7 +37,9 @@ shared/*      importable by all layers; shared imports domain only
 
 Forbidden: models importing repositories/services; repositories importing
 services/controllers; `src/config/env` beyond the composition roots
-(`server.ts`, `app.ts`, `routes/index.ts`, test helpers); `app.ts` importing
+(`server.ts`, `app.ts`, `routes/index.ts`, standalone scripts in
+`src/scripts/`, test helpers) — `config/database.ts` never resolves env
+itself, callers pass the URI and the autoIndex decision; `app.ts` importing
 anything below `routes/` except `routes/index.ts`; locally redeclaring a
 type that already exists in `src/types/` (see "Types & contracts").
 
@@ -171,6 +173,23 @@ tested code.** Full rule, bad/good examples and the review checklist live in
   discriminator; unknown keys throw, never fall through.
 - 2 stable branches stay a plain `if`: a strategy there is over-engineering
   (see the rubric in `docs/ocp.md`).
+
+## Shared helpers (validation & parsing)
+
+- `src/shared/validation/request-validation.ts` is THE single home for:
+  - **`hexIdSchema`** — the 24-hex-char Mongo ObjectId regex shared by every
+    entity id schema (users, projects...). Layer schemas COMPOSE it
+    (`z.object({ id: hexIdSchema })`); re-declaring the regex anywhere is a
+    rule violation (same for any duplicated schema).
+  - **`parseOrThrow(schema, value, message?)`** — THE controller parse path:
+    `safeParse`, on failure throws
+    `AppError('VALIDATION_ERROR', message, z.flattenError(...))`.
+    Inline `safeParse` + `AppError` blocks inside controller factories are
+    BANNED — call `parseOrThrow` with a precise message.
+- **One model method per mutation, ONE save per request mutation**:
+  multi-field updates go through a single `applyUpdate`-style method (each
+  `save()` re-opens the window for unique-index races), never one save per
+  field inside services.
 
 ## Complexity budget (CodeScene "Complex Method", cc ≤ 9)
 
