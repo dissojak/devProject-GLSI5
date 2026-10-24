@@ -1,7 +1,5 @@
 import mongoose, { type ConnectOptions } from 'mongoose';
 
-import { getEnv } from './env.js';
-
 /**
  * Owns the single Mongoose connection of the monolith.
  * - `strictQuery` is globally `'throw'`: unknown query filter keys THROW
@@ -29,16 +27,20 @@ export interface ConnectOverrides {
   autoIndex: boolean;
 }
 
+/**
+ * Connects the monolith's single Mongoose connection. The URI and the
+ * autoIndex decision ARRIVE FROM the caller (a composition root: server.ts,
+ * a standalone script, or a test helper) — config never reads env itself
+ * (docs/conventions.md, "Dependency direction").
+ */
 export async function connectDatabase(
-  mongodbUri?: string,
+  mongodbUri: string,
   overrides: Partial<ConnectOverrides> = {},
 ): Promise<void> {
-  const uri = mongodbUri ?? getEnv().mongodbUri;
-
   mongoose.set('strictQuery', 'throw');
 
-  await mongoose.connect(uri, {
-    autoIndex: overrides.autoIndex ?? (getEnv().nodeEnv !== 'production'),
+  await mongoose.connect(mongodbUri, {
+    autoIndex: overrides.autoIndex ?? false,
     serverSelectionTimeoutMS: 10_000,
   } satisfies ConnectOptions);
 }
