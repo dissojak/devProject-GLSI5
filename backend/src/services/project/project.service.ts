@@ -4,7 +4,11 @@ import { ConflictError, NotFoundError } from '../../domain/errors/index.js';
 import { Project } from '../../models/entities/index.js';
 import type { ProjectDocument } from '../../models/entities/index.js';
 import { ProjectRepository } from '../../repositories/project.repository.js';
-import type { CreateProjectInput, UpdateProjectInput } from './project.schema.js';
+import type {
+  CreateProjectInput,
+  UpdateProjectInput,
+  ListProjectsInput,
+} from './project.schema.js';
 
 function isDuplicateKeyError(error: unknown): boolean {
   return (
@@ -67,8 +71,42 @@ export function createProjectService(
     );
   }
 
-  async function list(userId: string): Promise<ProjectDocument[]> {
-    return projects.findByOwner(userId);
+  async function list(
+    userId: string,
+    pagination: ListProjectsInput,
+  ): Promise<{
+    message: string;
+    data: ProjectDocument[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      pageCount: number;
+    };
+  }> {
+    // BaseRepository.paginate is the single page/limit implementation:
+    // same defaults and page counting as the admin users list.
+    const result = await projects.paginate(
+      { owner: new Types.ObjectId(userId) },
+      {
+        page: pagination.page,
+        limit: pagination.limit,
+        // _id tie-break: documents created inside the same millisecond still
+        // come out in stable, deterministic order.
+        sort: { createdAt: -1, _id: -1 },
+      },
+    );
+
+    return {
+      message: 'Projects retrieved successfully',
+      data: result.items,
+      pagination: {
+        page: result.page,
+        limit: result.limit,
+        total: result.total,
+        pageCount: result.pageCount,
+      },
+    };
   }
 
   async function get(
@@ -85,14 +123,13 @@ export function createProjectService(
   ): Promise<ProjectDocument> {
     const project = await findOwnedProject(userId, projectId);
 
+    // ONE save per update: rename + describe previously meant two writes
+    // (and two unique-index race windows) for a single PATCH.
     return rejectDuplicateName(async () => {
-      if (input.name !== undefined) {
-        await project.rename(input.name);
-      }
-
-      if (input.description !== undefined) {
-        await project.describe(input.description);
-      }
+      await project.applyUpdate({
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.description !== undefined ? { description: input.description } : {}),
+      });
 
       return project;
     });

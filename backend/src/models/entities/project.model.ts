@@ -39,8 +39,15 @@ export interface ProjectStatics {
 }
 
 export interface ProjectMethods extends SoftDeletableMethods {
-  rename(newName: string): Promise<ProjectDocument>;
-  describe(description: string): Promise<ProjectDocument>;
+  /**
+   * The single field-update path: optional name/description, ONE save.
+   * update-with-two-saves (one per field) is banned in services - each
+   * save re-opens the unique-index race window for duplicate names.
+   */
+  applyUpdate(fields: {
+    name?: string;
+    description?: string;
+  }): Promise<ProjectDocument>;
   connectRepository(
     repo: RepoCoordinates | { url: string },
     branch: string,
@@ -141,20 +148,21 @@ projectSchema.statics.createFor = async function createFor(
   return created.save() as unknown as Promise<ProjectDocument>;
 };
 
-projectSchema.methods.rename = async function rename(
+projectSchema.methods.applyUpdate = async function applyUpdate(
   this: ProjectDocument,
-  newName: string,
+  fields: { name?: string; description?: string },
 ): Promise<ProjectDocument> {
-  this.set('name', newName.trim());
+  if (fields.name === undefined && fields.description === undefined) {
+    throw new InvariantViolationError('applyUpdate: at least one field required');
+  }
 
-  return this.save() as unknown as Promise<ProjectDocument>;
-};
+  if (fields.name !== undefined) {
+    this.set('name', fields.name.trim());
+  }
 
-projectSchema.methods.describe = async function describe(
-  this: ProjectDocument,
-  description: string,
-): Promise<ProjectDocument> {
-  this.set('description', description.trim());
+  if (fields.description !== undefined) {
+    this.set('description', fields.description.trim());
+  }
 
   return this.save() as unknown as Promise<ProjectDocument>;
 };

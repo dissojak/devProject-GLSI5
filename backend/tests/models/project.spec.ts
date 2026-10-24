@@ -198,13 +198,21 @@ describe('Project model', () => {
       expect(project.isOwnedBy('64b1f6274190d8fe2ee1ba77' as unknown as Types.ObjectId)).toBe(false);
     });
 
-    it('rename and describe update the fields', async () => {
+    it('applyUpdate sets both fields with ONE save', async () => {
       const project = await Project.createFor({ ownerId, name: 'app' });
-      const renamed = await project.rename('  app-v2 ');
-      expect(renamed.name).toBe('app-v2');
+      const updated = await project.applyUpdate({
+        name: '  app-v2 ',
+        description: 'hello world',
+      });
+      expect(updated.name).toBe('app-v2');
+      expect(updated.description).toBe('hello world');
+    });
 
-      const described = await renamed.describe('hello world');
-      expect(described.description).toBe('hello world');
+    it('applyUpdate rejects an empty fields call (invariant: nothing to save)', async () => {
+      const project = await Project.createFor({ ownerId, name: 'app' });
+      await expect(project.applyUpdate({})).rejects.toThrowError(
+        InvariantViolationError,
+      );
     });
 
     it('soft-deleted projects are hidden from default queries', async () => {
