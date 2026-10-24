@@ -11,6 +11,9 @@ config, Vitest.
 - `docs/ocp.md` — Open-Closed Principle rule: strategy + registry pattern,
   when NOT to use it, review checklist.
 - Agent skill for AI models (any tool): `skills/backend-rules/SKILL.md`.
+  Browser models (claude.ai, no filesystem access): paste
+  `skills/backend-rules/CLAUDE-BROWSER.md` as the first message instead —
+  it is the same contract, fully inline, zero repo reads needed.
   opencode already discovers it via project `.opencode/skills/` and the
   `~/.agents/skills` / `~/.claude/skills` symlinks; other tools (Claude
   Code, Codex, Cursor, Cline...) read `../AGENTS.md` at the repo root,
