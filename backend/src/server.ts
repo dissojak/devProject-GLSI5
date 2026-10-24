@@ -16,7 +16,7 @@ async function main(): Promise<void> {
   const app = createApp(logger);
   const server: Server = app.listen(env.port);
 
-  await connectDatabase(env.mongodbUri);
+  await connectDatabase(env.mongodbUri, { autoIndex: env.nodeEnv !== 'production' });
   logger.info({ port: env.port, env: env.nodeEnv }, 'server started');
 
   async function shutdown(signal: NodeJS.Signals): Promise<void> {
