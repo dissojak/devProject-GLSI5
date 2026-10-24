@@ -1,29 +1,15 @@
 
 import type { RequestHandler } from 'express';
 
-import { z } from 'zod';
-
-import {
-  AppError,
-} from '../domain/errors/index.js';
+import { parseOrThrow } from '../shared/validation/request-validation.js';
+import { userIdSchema } from '../services/users/user.schema.js';
 
 import type {
   UserApprovalService,
 } from '../services/users/user-approval.service.js';
-import { userIdSchema } from '../services/users/user.schema.js';
 
 function readId(params: unknown): string {
-  const result = userIdSchema.safeParse(params);
-
-  if (!result.success) {
-    throw new AppError(
-      'VALIDATION_ERROR',
-      'Invalid request data',
-      z.flattenError(result.error),
-    );
-  }
-
-  return result.data.id;
+  return parseOrThrow(userIdSchema, params).id;
 }
 
 export function createListPendingController(

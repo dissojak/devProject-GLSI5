@@ -2,12 +2,10 @@
 import { z } from 'zod';
 
 import { USER_ROLES } from '../../domain/enums/user.enums.js';
+import { hexIdSchema } from '../../shared/validation/request-validation.js';
 
 export const userIdSchema = z.object({
-  id: z.string().regex(
-    /^[a-fA-F0-9]{24}$/,
-    'Invalid MongoDB user ID',
-  ),
+  id: hexIdSchema,
 });
 
 export const searchUsersSchema = z.object({

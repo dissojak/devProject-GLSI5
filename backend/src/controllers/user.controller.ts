@@ -1,10 +1,9 @@
 
 import type { RequestHandler } from 'express';
-import { z } from 'zod';
 
-import { AppError } from '../domain/errors/index.js';
 import type { AuthUser } from '../types/index.js';
 import type { UserService } from '../types/index.js';
+import { parseOrThrow } from '../shared/validation/request-validation.js';
 
 import {
   userIdSchema,
@@ -13,25 +12,8 @@ import {
   changeRoleSchema,
 } from '../services/users/user.schema.js';
 
-function validate<T>(
-  schema: z.ZodType<T>,
-  value: unknown,
-): T {
-  const result = schema.safeParse(value);
-
-  if (!result.success) {
-    throw new AppError(
-      'VALIDATION_ERROR',
-      'Invalid request data',
-      z.flattenError(result.error),
-    );
-  }
-
-  return result.data;
-}
-
 function getId(params: unknown): string {
-  return validate(userIdSchema, params).id;
+  return parseOrThrow(userIdSchema, params).id;
 }
 
 function getActor(res: {
@@ -45,10 +27,7 @@ export function createListUsersController(
   service: UserService,
 ): RequestHandler {
   return async (req, res) => {
-    const input = validate(
-      searchUsersSchema,
-      req.query,
-    );
+    const input = parseOrThrow(searchUsersSchema, req.query);
 
     const result = await service.listUsers(input);
 
@@ -74,10 +53,7 @@ export function createUpdateUserController(
   return async (req, res) => {
     const id = getId(req.params);
 
-    const input = validate(
-      updateUserSchema,
-      req.body,
-    );
+    const input = parseOrThrow(updateUserSchema, req.body);
 
     const user = await service.updateUser(id, input);
 
@@ -91,10 +67,7 @@ export function createChangeRoleController(
   return async (req, res) => {
     const id = getId(req.params);
 
-    const input = validate(
-      changeRoleSchema,
-      req.body,
-    );
+    const input = parseOrThrow(changeRoleSchema, req.body);
 
     const actor = getActor(res);
 
