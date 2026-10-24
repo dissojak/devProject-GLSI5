@@ -5,6 +5,7 @@ import { getEnv } from '../config/env.js';
 // Feature routers
 import { createAuthRouter } from './auth.routes.js';
 import { createGithubAuthRouter } from './github-auth.routes.js';
+import { createProjectRouter } from './project.routes.js';
 import { createUsersRouter } from './users.routes.js';
 import { createUserApprovalRouter } from './user-approval.routes.js';
 // Middleware factories
@@ -13,12 +14,14 @@ import { createRequireAuth } from '../middleware/require-auth.js';
 // Repositories
 import { UserRepository } from '../repositories/user.repository.js';
 import { AuthIdentityRepository } from '../repositories/auth-identity.repository.js';
+import { ProjectRepository } from '../repositories/project.repository.js';
 
 // Functional service factories
 import { createAuthService } from '../services/auth/auth.service.js';
 import { createGithubAuthService } from '../services/auth/github-auth.service.js';
 import { createGithubOAuthService } from '../services/auth/github-oauth.service.js';
 import { createSessionTokenService } from '../services/auth/session-token.service.js';
+import { createProjectService } from '../services/project/project.service.js';
 import { createUserService } from '../services/users/user.service.js';
 import { createUserApprovalService } from '../services/users/user-approval.service.js';
 
@@ -39,15 +42,14 @@ export function createApiRouter(): Router {
   // Repositories
   const users = new UserRepository();
   const identities = new AuthIdentityRepository();
+  const projects = new ProjectRepository();
 
   // Shared services
+  const sessions = createSessionTokenService(env.sessionSecret);
   const authService = createAuthService(users);
   const userService = createUserService(users);
   const approvalService = createUserApprovalService(users);
-
-  const sessions = createSessionTokenService(
-    env.sessionSecret,
-  );
+  const projectService = createProjectService(projects);
 
   const githubOAuthService = createGithubOAuthService(
     env.githubClientId,
@@ -77,14 +79,14 @@ export function createApiRouter(): Router {
 
   // GitHub OAuth authentication
   router.use(
-  '/auth',
-  createGithubAuthRouter({
-    oauth: githubOAuthService,
-    auth: githubAuthService,
-    sessions,
-    secureCookies: env.nodeEnv === 'production',
-  }),
-);
+    '/auth',
+    createGithubAuthRouter({
+      oauth: githubOAuthService,
+      auth: githubAuthService,
+      sessions,
+      secureCookies: env.nodeEnv === 'production',
+    }),
+  );
 
   // Administrator user approval - MUST mount before the generic
   // /admin/users routes, otherwise GET /users/pending is swallowed by
@@ -99,6 +101,9 @@ export function createApiRouter(): Router {
     '/admin',
     createUsersRouter(userService, requireAuth),
   );
+
+  // User project management
+  router.use('/projects', createProjectRouter(projectService, requireAuth));
 
   return router;
 }

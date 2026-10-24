@@ -29,6 +29,10 @@ export const swaggerDocument = {
       name: 'Admin - Users',
       description: 'Gestion des utilisateurs par un administrateur',
     },
+    {
+      name: 'Projects',
+      description: 'Gestion des projets de l’utilisateur connecté',
+    },
   ],
 
   paths: {
@@ -491,9 +495,184 @@ export const swaggerDocument = {
   },
 },
 
+    '/api/v1/projects': {
+      post: {
+        tags: ['Projects'],
+        summary: 'Créer un projet',
+        description:
+          'Crée un projet pour l’utilisateur connecté. Le nom doit être unique parmi ses projets actifs.',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/CreateProjectInput' },
+            },
+          },
+        },
+        responses: {
+          '201': {
+            description: 'Projet créé',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ProjectResponse' },
+              },
+            },
+          },
+          '400': { $ref: '#/components/responses/ValidationError' },
+          '401': { $ref: '#/components/responses/Unauthorized' },
+          '409': { $ref: '#/components/responses/Conflict' },
+        },
+      },
+
+      get: {
+        tags: ['Projects'],
+        summary: 'Lister mes projets',
+        description:
+          'Retourne les projets de l’utilisateur connecté, du plus récent au plus ancien.',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          '200': {
+            description: 'Liste des projets',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ProjectListResponse' },
+              },
+            },
+          },
+          '401': { $ref: '#/components/responses/Unauthorized' },
+        },
+      },
+    },
+
+    '/api/v1/projects/{id}': {
+      get: {
+        tags: ['Projects'],
+        summary: 'Voir un projet',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ $ref: '#/components/parameters/ProjectId' }],
+        responses: {
+          '200': {
+            description: 'Projet trouvé',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ProjectResponse' },
+              },
+            },
+          },
+          '400': { $ref: '#/components/responses/ValidationError' },
+          '401': { $ref: '#/components/responses/Unauthorized' },
+          '404': { $ref: '#/components/responses/NotFound' },
+        },
+      },
+
+      patch: {
+        tags: ['Projects'],
+        summary: 'Modifier un projet',
+        description: 'Modifie le nom et/ou la description. Au moins un champ est requis.',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ $ref: '#/components/parameters/ProjectId' }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/UpdateProjectInput' },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'Projet mis à jour',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ProjectResponse' },
+              },
+            },
+          },
+          '400': { $ref: '#/components/responses/ValidationError' },
+          '401': { $ref: '#/components/responses/Unauthorized' },
+          '404': { $ref: '#/components/responses/NotFound' },
+          '409': { $ref: '#/components/responses/Conflict' },
+        },
+      },
+
+      delete: {
+        tags: ['Projects'],
+        summary: 'Supprimer un projet',
+        description:
+          'Suppression logique (soft delete) : le nom redevient disponible.',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ $ref: '#/components/parameters/ProjectId' }],
+        responses: {
+          '200': {
+            description: 'Projet supprimé',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    message: { type: 'string', example: 'Project deleted successfully' },
+                  },
+                },
+              },
+            },
+          },
+          '400': { $ref: '#/components/responses/ValidationError' },
+          '401': { $ref: '#/components/responses/Unauthorized' },
+          '404': { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+
   },
 
   components: {
+    parameters: {
+      ProjectId: {
+        name: 'id',
+        in: 'path',
+        required: true,
+        description: 'Identifiant du projet (24 caractères hexadécimaux)',
+        schema: { type: 'string', pattern: '^[0-9a-fA-F]{24}$' },
+        example: '507f1f77bcf86cd799439011',
+      },
+    },
+
+    responses: {
+      ValidationError: {
+        description: 'Données invalides',
+        content: {
+          'application/json': {
+            schema: { $ref: '#/components/schemas/ErrorResponse' },
+          },
+        },
+      },
+      Unauthorized: {
+        description: 'Non authentifié ou session expirée',
+        content: {
+          'application/json': {
+            schema: { $ref: '#/components/schemas/ErrorResponse' },
+          },
+        },
+      },
+      NotFound: {
+        description: 'Ressource introuvable (ou n’appartenant pas à l’utilisateur courant)',
+        content: {
+          'application/json': {
+            schema: { $ref: '#/components/schemas/ErrorResponse' },
+          },
+        },
+      },
+      Conflict: {
+        description: 'Nom de projet déjà utilisé',
+        content: {
+          'application/json': {
+            schema: { $ref: '#/components/schemas/ErrorResponse' },
+          },
+        },
+      },
+    },
+
     schemas: {
       RegisterInput: {
         type: 'object',
@@ -564,6 +743,80 @@ export const swaggerDocument = {
         },
       },
 
+      ErrorResponse: {
+        type: 'object',
+        properties: {
+          error: {
+            type: 'object',
+            properties: {
+              code: { type: 'string', example: 'VALIDATION_ERROR' },
+              message: { type: 'string', example: 'Invalid project data' },
+              details: { type: 'object' },
+            },
+          },
+        },
+      },
+
+      CreateProjectInput: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['name'],
+        properties: {
+          name: { type: 'string', minLength: 1, maxLength: 120, example: 'mon-api-node' },
+          description: {
+            type: 'string',
+            maxLength: 1000,
+            example: 'API Node.js à déployer sur Kubernetes',
+          },
+          environment: {
+            type: 'string',
+            description: 'Valeur de PROJECT_ENVIRONMENTS (défaut : DEVELOPMENT)',
+            example: 'DEVELOPMENT',
+          },
+        },
+      },
+
+      UpdateProjectInput: {
+        type: 'object',
+        additionalProperties: false,
+        minProperties: 1,
+        properties: {
+          name: { type: 'string', minLength: 1, maxLength: 120, example: 'mon-api-node-v2' },
+          description: { type: 'string', maxLength: 1000, example: 'Nouvelle description' },
+        },
+      },
+
+      Project: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', example: '507f1f77bcf86cd799439011' },
+          owner: { type: 'string', example: '507f191e810c19729de860ea' },
+          name: { type: 'string', example: 'mon-api-node' },
+          description: { type: 'string', example: 'API Node.js à déployer sur Kubernetes' },
+          environment: { type: 'string', example: 'DEVELOPMENT' },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
+        },
+      },
+
+      ProjectResponse: {
+        type: 'object',
+        properties: {
+          message: { type: 'string', example: 'Project created successfully' },
+          data: { $ref: '#/components/schemas/Project' },
+        },
+      },
+
+      ProjectListResponse: {
+        type: 'object',
+        properties: {
+          message: { type: 'string', example: 'Projects retrieved successfully' },
+          data: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/Project' },
+          },
+        },
+      },
       RegisterResponse: {
         type: 'object',
         properties: {
