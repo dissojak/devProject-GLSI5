@@ -6,3 +6,5 @@
  */
 export * from './auth.types.js';
 export * from './github.types.js';
+export * from './session-token.types.js';
+export * from './user.types.js';

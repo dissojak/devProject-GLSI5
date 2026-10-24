@@ -1,24 +1,37 @@
 import mongoose from 'mongoose';
+
 import {
   ConflictError,
+  ForbiddenError,
   UnauthorizedError,
 } from '../../domain/errors/index.js';
 
-import type { UserDocument } from '../../models/entities/index.js';
-import { UserRepository } from '../../repositories/user.repository.js';
-import { AuthIdentityRepository } from '../../repositories/auth-identity.repository.js';
+import type {
+  UserDocument,
+} from '../../models/entities/index.js';
 
-import type { GithubProfile } from '../../types/index.js';
+import {
+  UserRepository,
+} from '../../repositories/user.repository.js';
 
-/**
- * Functional service factory (docs/conventions.md, "Services"). Same rule as
- * every service: closures, dependencies as parameters, default-wired values.
- */
+import {
+  AuthIdentityRepository,
+} from '../../repositories/auth-identity.repository.js';
+
+import type {
+  GithubProfile,
+} from '../../types/index.js';
+
 export function createGithubAuthService(
   users: UserRepository = new UserRepository(),
-  identities: AuthIdentityRepository = new AuthIdentityRepository(),
+  identities: AuthIdentityRepository =
+    new AuthIdentityRepository(),
 ) {
-  async function login(profile: GithubProfile): Promise<UserDocument> {
+  async function login(
+    profile: GithubProfile,
+  ): Promise<UserDocument> {
+
+    // 1. Vérifier si ce compte GitHub est déjà lié
     const identity = await identities.findGithubIdentity(
       profile.githubId,
     );
@@ -30,15 +43,20 @@ export function createGithubAuthService(
       );
 
       if (!user) {
-        throw new UnauthorizedError('Account not found');
+        throw new UnauthorizedError(
+          'Account not found',
+        );
       }
 
+      // Vérifier le statut AVANT de produire un JWT
       user.assertCanAuthenticate();
 
       await user.recordLogin();
+
       return user;
     }
 
+    // 2. Vérifier si l'email existe déjà
     const existingUser = await users.findByEmail(
       profile.email,
       { withDeleted: true },
@@ -50,6 +68,7 @@ export function createGithubAuthService(
       );
     }
 
+    // 3. Créer le développeur en attente
     let createdUser: UserDocument | undefined;
 
     await mongoose.connection.transaction(async (session) => {
@@ -58,6 +77,7 @@ export function createGithubAuthService(
           name: profile.name,
           email: profile.email,
           role: 'DEVELOPER',
+          status: 'PENDING',
         },
         { session },
       );
@@ -75,13 +95,14 @@ export function createGithubAuthService(
       throw new Error('User creation failed');
     }
 
-    return createdUser;
+    // 4. Ne pas autoriser immédiatement la connexion
+    throw new ForbiddenError(
+      'Account created. Waiting for administrator approval.',
+    );
   }
 
   return { login };
 }
 
-/**
- * Service contract, derived at its SOURCE - never redeclared elsewhere.
- */
-export type GithubAuthService = ReturnType<typeof createGithubAuthService>;
+export type GithubAuthService =
+  ReturnType<typeof createGithubAuthService>;

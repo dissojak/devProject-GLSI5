@@ -41,7 +41,3 @@ export function createSessionTokenService(
   return { create, verify };
 }
 
-/**
- * Service contract, derived at its SOURCE - never redeclared elsewhere.
- */
-export type SessionTokenService = ReturnType<typeof createSessionTokenService>;

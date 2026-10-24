@@ -36,7 +36,7 @@ describe('UserRepository', () => {
     it('excludes deactivated accounts unless opted in', async () => {
       const target = users[2];
       if (!target) throw new Error('missing fixture');
-      await target.deactivate();
+      await target.softDelete();
 
       const repo = new UserRepository();
       expect(await repo.findByEmail('dev2@example.com')).toBeNull();
@@ -82,7 +82,7 @@ describe('UserRepository', () => {
     it('excludes deactivated users unless includeDeleted', async () => {
       const target = users[3];
       if (!target) throw new Error('missing fixture');
-      await target.deactivate();
+      await target.softDelete();
 
       const visible = await new UserRepository().search({});
       expect(visible.items).toHaveLength(3);

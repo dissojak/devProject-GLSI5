@@ -8,7 +8,7 @@ import type { RequestHandler, Response } from 'express';
 
 import type { GithubOAuthService } from '../services/auth/github-oauth.service.js';
 import type { GithubAuthService } from '../services/auth/github-auth.service.js';
-import type { SessionTokenService } from '../services/auth/session-token.service.js';
+import type { SessionTokenService } from '../types/index.js';
 
 const OAUTH_MAX_AGE = 5 * 60 * 1000;
 
@@ -22,7 +22,6 @@ export interface GithubAuthDeps {
   oauth: GithubOAuthService;
   auth: GithubAuthService;
   sessions: SessionTokenService;
-  frontendUrl: string;
   secureCookies: boolean;
 }
 
@@ -98,6 +97,7 @@ export function createGithubStartController(
   };
 }
 
+
 export function createGithubCallbackController(
   deps: GithubAuthDeps,
 ): RequestHandler {
@@ -111,6 +111,7 @@ export function createGithubCallbackController(
     const verifier: unknown =
       req.signedCookies?.oauth_verifier;
 
+    // Supprimer les données temporaires OAuth
     clearOAuthCookies(res, deps.secureCookies);
 
     const callbackData = getOAuthCallbackData(
@@ -130,23 +131,38 @@ export function createGithubCallbackController(
       return;
     }
 
+    // Échanger le code OAuth et récupérer le profil
     const profile = await deps.oauth.getProfile(
       callbackData.code,
       callbackData.verifier,
     );
 
+    // Retrouver ou créer le compte MongoDB
     const user = await deps.auth.login(profile);
 
-    const token = await deps.sessions.create(user.id);
+    // Générer le JWT de DeploymentPlanner AI
+    const accessToken = await deps.sessions.create(user.id);
 
-    res.cookie('session', token, {
-      httpOnly: true,
-      secure: deps.secureCookies,
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 60 * 60 * 1000,
+    // Empêcher la mise en cache de la réponse sensible
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+
+    // AUCUN cookie de session n'est créé
+    res.status(200).json({
+      message: 'GitHub authentication successful',
+
+      data: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+
+      accessToken,
+      tokenType: 'Bearer',
+      expiresIn: 3600,
     });
-
-    res.redirect(deps.frontendUrl);
   };
 }
+

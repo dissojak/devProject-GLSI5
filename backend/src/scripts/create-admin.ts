@@ -43,7 +43,10 @@ async function main(): Promise<void> {
       role: 'ADMIN',
     });
 
-    console.log('Administrateur créé :', admin.email);
+    // PENDING -> ACTIVE : le bootstrapping admin doit pouvoir se connecter.
+    await admin.approve();
+
+    console.log('Administrateur créé (actif) :', admin.email);
   } finally {
     rl.close();
     await disconnectDatabase();

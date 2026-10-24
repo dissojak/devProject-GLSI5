@@ -8,6 +8,11 @@ config, Vitest.
   transactions, deviations from the initial report.
 - `docs/conventions.md` — folder rules, dependency direction, how to add a
   model / state machine, error handling, testing.
+- `docs/ocp.md` — Open-Closed Principle rule: strategy + registry pattern,
+  when NOT to use it, review checklist.
+- **AI coding assistants** must read `docs/conventions.md` + `docs/ocp.md`
+  before generating code in this repo; their rules are enforced by ESLint
+  and code review.
 
 ## Requirements
 
@@ -58,8 +63,16 @@ unique `(owner, name)` on projects) are only created by the sync script:
 
 ```bash
 npm run db:sync-indexes            # dry-run: prints the declared-vs-current diff
+npm run db:backfill-user-status    # one-time data migration (pre-approval users)
+
 npm run db:sync-indexes -- --apply # creates/drops the diff (run this on every deploy)
 ```
+
+`db:backfill-user-status` is a ONE-TIME data migration: it stamps the
+`User.status` field introduced by the approval workflow onto every user that
+predates it (`deletedAt: null -> ACTIVE`, else `DISABLED`). Existing users in
+the database have no `status` until it runs — without it nobody (including
+admins) can authenticate.
 
 That script is mandatory on every deploy: unique and partial indexes only exist
 if it ran there. It exits non-zero if any model fails to sync.

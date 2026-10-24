@@ -12,6 +12,19 @@ import { baseSchemaOptions } from '../plugins/base-schema-options.js';
 import { softDeletePlugin, type SoftDeletableMethods } from '../plugins/soft-delete.js';
 import { argon2PasswordHasher } from '../../shared/security/password-hasher.js';
 
+import {
+  ACCOUNT_STATUSES,
+  type AccountStatus,
+} from '../../domain/enums/account-status.enums.js';
+
+import {
+  accountApprovalMachine,
+} from '../../domain/state-machine/account-approval.machine.js';
+
+import {
+  ForbiddenError,
+} from '../../domain/errors/index.js';
+
 /**
  * User - a platform account. Soft-deleted means "deactivated": the document
  * stays in the collection (its email remains reserved, per the unique index).
@@ -22,6 +35,7 @@ export interface UserFields {
   email: string;
   passwordHash?: string;
   role: UserRole;
+  status: AccountStatus;
   lastLoginAt?: Date | null;
 }
 
@@ -40,6 +54,8 @@ export interface UserMethods extends SoftDeletableMethods {
   isAdmin(): boolean;
   assertCanAuthenticate(): void;
   hasLocalPassword(): boolean;
+  approve(): Promise<UserDocument>;
+  reject(): Promise<UserDocument>;
 }
 
 export type UserVirtuals = { isActive: boolean; isDeleted: boolean };
@@ -85,6 +101,12 @@ const userSchema = new Schema<
     passwordHash: { type: String, required: false, select: false },
     role: { type: String, required: true, enum: USER_ROLES, default: 'DEVELOPER' },
     lastLoginAt: { type: Date, default: null },
+    status: {
+    type: String,
+    enum: ACCOUNT_STATUSES,
+    required: true,
+    default: 'PENDING',
+    },
   },
   baseSchemaOptions(),
 );
@@ -181,29 +203,60 @@ userSchema.methods.changeRole = async function changeRole(
   return this.save() as unknown as Promise<UserDocument>;
 };
 
-userSchema.methods.deactivate = async function deactivate(
-  this: UserDocument,
-): Promise<UserDocument> {
-  return this.softDelete() as unknown as Promise<UserDocument>;
-};
 
-userSchema.methods.reactivate = async function reactivate(
-  this: UserDocument,
-): Promise<UserDocument> {
-  return this.restore() as unknown as Promise<UserDocument>;
-};
+userSchema.methods.deactivate =
+  async function deactivate(
+    this: UserDocument,
+  ): Promise<UserDocument> {
+    accountApprovalMachine.assertTransition(
+      this.status,
+      'DISABLED',
+    );
+
+    // Ne pas utiliser softDelete ici :
+    // le statut DISABLED devient la source de vérité.
+    this.set('status', 'DISABLED');
+
+    return this.save() as unknown as Promise<UserDocument>;
+  };
+
+userSchema.methods.reactivate =
+  async function reactivate(
+    this: UserDocument,
+  ): Promise<UserDocument> {
+    accountApprovalMachine.assertTransition(
+      this.status,
+      'ACTIVE',
+    );
+
+    this.set('status', 'ACTIVE');
+
+    return this.save() as unknown as Promise<UserDocument>;
+  };
+
 
 userSchema.methods.isAdmin = function isAdmin(this: UserDocument): boolean {
   return this.get('role') === 'ADMIN';
 };
 
-userSchema.methods.assertCanAuthenticate = function assertCanAuthenticate(
-  this: UserDocument,
-): void {
-  if (this.get('deletedAt') != null) {
-    throw new AccountDisabledError('Account is deactivated');
-  }
-};
+
+userSchema.methods.assertCanAuthenticate =
+  function assertCanAuthenticate(
+    this: UserDocument,
+  ): void {
+    if (this.get('deletedAt') != null) {
+      throw new AccountDisabledError(
+        'Account is deactivated',
+      );
+    }
+
+    if (this.status !== 'ACTIVE') {
+      throw new ForbiddenError(
+        'Account is not approved or is disabled',
+      );
+    }
+  };
+
 
 userSchema.methods.hasLocalPassword = function hasLocalPassword(
   this: UserDocument,
@@ -228,6 +281,34 @@ userSchema.methods.hasLocalPassword = function hasLocalPassword(
 userSchema.virtual('isActive').get(function isActiveVirtual(this: UserDocument): boolean {
   return this.get('deletedAt') == null;
 });
+
+
+userSchema.methods.approve = async function approve(
+  this: UserDocument,
+): Promise<UserDocument> {
+  accountApprovalMachine.assertTransition(
+    this.status,
+    'ACTIVE',
+  );
+
+  this.set('status', 'ACTIVE');
+
+  return this.save() as unknown as Promise<UserDocument>;
+};
+
+userSchema.methods.reject = async function reject(
+  this: UserDocument,
+): Promise<UserDocument> {
+  accountApprovalMachine.assertTransition(
+    this.status,
+    'REJECTED',
+  );
+
+  this.set('status', 'REJECTED');
+
+  return this.save() as unknown as Promise<UserDocument>;
+};
+
 
 export const USER_MODEL_NAME = 'User' as const;
 export const User = mongoose.model(USER_MODEL_NAME, userSchema);

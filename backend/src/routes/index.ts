@@ -2,55 +2,103 @@ import { Router } from 'express';
 
 import { getEnv } from '../config/env.js';
 
-// Feature wiring
+// Feature routers
 import { createAuthRouter } from './auth.routes.js';
 import { createGithubAuthRouter } from './github-auth.routes.js';
+import { createUsersRouter } from './users.routes.js';
+import { createUserApprovalRouter } from './user-approval.routes.js';
+// Middleware factories
+import { createRequireAuth } from '../middleware/require-auth.js';
 
-// Repositories: built HERE, only here
+// Repositories
 import { UserRepository } from '../repositories/user.repository.js';
 import { AuthIdentityRepository } from '../repositories/auth-identity.repository.js';
 
-// Services (functional factories; deps default-wire themselves)
+// Functional service factories
 import { createAuthService } from '../services/auth/auth.service.js';
 import { createGithubAuthService } from '../services/auth/github-auth.service.js';
 import { createGithubOAuthService } from '../services/auth/github-oauth.service.js';
 import { createSessionTokenService } from '../services/auth/session-token.service.js';
+import { createUserService } from '../services/users/user.service.js';
+import { createUserApprovalService } from '../services/users/user-approval.service.js';
 
 /**
- * THE composition root of the application (see docs/conventions.md,
- * "Composition"):
+ * API composition root.
  *
- * - the ONLY file allowed to build repositories and read `getEnv()` outside
- *   app.ts/server.ts;
- * - every feature router receives its dependencies from here exactly once,
- *   so each `createXxxService()` call is visible in a single place;
- * - feature route files below never build anything: they only declare paths
- *   and call controller factories on the route line.
+ * Responsibilities:
+ * - Load validated environment configuration.
+ * - Instantiate repositories once.
+ * - Build functional services.
+ * - Inject dependencies into feature routers.
+ *
+ * No business logic or database queries.
  */
 export function createApiRouter(): Router {
   const env = getEnv();
 
-  // Every repository in the app is built HERE, and only here.
+  // Repositories
   const users = new UserRepository();
   const identities = new AuthIdentityRepository();
 
+  // Shared services
   const authService = createAuthService(users);
+  const userService = createUserService(users);
+  const approvalService = createUserApprovalService(users);
 
+  const sessions = createSessionTokenService(
+    env.sessionSecret,
+  );
+
+  const githubOAuthService = createGithubOAuthService(
+    env.githubClientId,
+    env.githubClientSecret,
+    env.githubCallbackUrl,
+  );
+
+  const githubAuthService = createGithubAuthService(
+    users,
+    identities,
+  );
+
+  // Authentication middleware
+  const requireAuth = createRequireAuth(
+    sessions,
+    userService,
+  );
+
+  // Main API router
   const router = Router();
 
-  router.use('/auth', createAuthRouter(authService));
+  // Email/password authentication
+  router.use(
+    '/auth',
+    createAuthRouter(authService, sessions),
+  );
 
-  router.use('/auth', createGithubAuthRouter({
-    oauth: createGithubOAuthService(
-      env.githubClientId,
-      env.githubClientSecret,
-      env.githubCallbackUrl,
-    ),
-    auth: createGithubAuthService(users, identities),
-    sessions: createSessionTokenService(env.sessionSecret),
-    frontendUrl: env.frontendUrl,
+  // GitHub OAuth authentication
+  router.use(
+  '/auth',
+  createGithubAuthRouter({
+    oauth: githubOAuthService,
+    auth: githubAuthService,
+    sessions,
     secureCookies: env.nodeEnv === 'production',
-  }));
+  }),
+);
+
+  // Administrator user approval - MUST mount before the generic
+  // /admin/users routes, otherwise GET /users/pending is swallowed by
+  // GET /users/:id (id="pending" -> 400) - see docs/conventions.md.
+  router.use(
+    '/admin',
+    createUserApprovalRouter(approvalService, requireAuth),
+  );
+
+  // Administrator user management
+  router.use(
+    '/admin',
+    createUsersRouter(userService, requireAuth),
+  );
 
   return router;
 }

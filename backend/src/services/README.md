@@ -41,6 +41,10 @@ in docs/conventions.md ("Types & contracts"). Input types such as
 `RegisterInput`/`LoginInput` stay `z.infer` exports of the schemas in this
 folder — their only source.
 
+Before adding a growing `switch`/`if` chain here, read the OCP rule:
+`docs/ocp.md` — extension adds strategy files + one register() line, never
+edits the dispatcher.
+
 Dependency rule: `services -> repositories + models + domain + shared +
 types`. services must NEVER import controllers, routes, middleware or
 `config/`.
