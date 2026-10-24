@@ -70,7 +70,7 @@ describe('BaseRepository (via User)', () => {
     it('findOne/find/count/exists exclude soft-deleted docs by default', async () => {
       const target = users[1];
       if (!target) throw new Error('missing fixture');
-      await target.deactivate();
+      await target.softDelete();
 
       expect(await repo().exists({ email: 'user1@example.com' })).toBe(false);
       expect(await repo().exists({ email: 'user1@example.com' }, { withDeleted: true })).toBe(true);
@@ -86,7 +86,7 @@ describe('BaseRepository (via User)', () => {
     it('findById excludes soft-deleted docs unless withDeleted', async () => {
       const target = users[2];
       if (!target) throw new Error('missing fixture');
-      await target.deactivate();
+      await target.softDelete();
 
       expect(await repo().findById(target._id)).toBeNull();
       expect((await repo().findById(target._id, { withDeleted: true }))?.name).toBe('user 2');

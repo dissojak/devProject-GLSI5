@@ -94,7 +94,7 @@ describe('User model', () => {
 
     it('enforces unique email, even against soft-deleted users', async () => {
       const first = await registerValid();
-      await first.deactivate();
+      await first.softDelete();
       await expect(
         User.register({ name: 'Bob', email: EMAIL_A, password: 'another-pass-1' }),
       ).rejects.toThrowError(/duplicate key|E11000/);
@@ -157,45 +157,43 @@ describe('User model', () => {
     });
   });
 
-  describe('soft delete integration', () => {
-    it('isActive reflects soft-deletion', async () => {
+  describe('account lifecycle (approval machine)', () => {
+    it('new accounts are PENDING and cannot authenticate until approved', async () => {
       const user = await registerValid();
-      expect(user.isActive).toBe(true);
+      expect(user.status).toBe('PENDING');
+      expect(() => user.assertCanAuthenticate()).toThrowError(/not approved/);
 
-      const deactivated = await user.deactivate();
-      expect(deactivated.isDeleted).toBe(true);
-      expect(deactivated.isActive).toBe(false);
+      const approved = await user.approve();
+      expect(approved.status).toBe('ACTIVE');
+      expect(() => approved.assertCanAuthenticate()).not.toThrow();
     });
 
-    it('assertCanAuthenticate throws AccountDisabledError when deleted', async () => {
+    it('ACTIVE -> DISABLED -> ACTIVE (reactivate), NEVER soft-deletes', async () => {
       const user = await registerValid();
-      user.assertCanAuthenticate();
+      await user.approve();
 
       const deactivated = await user.deactivate();
-      expect(() => deactivated.assertCanAuthenticate()).toThrowError(AccountDisabledError);
-      expect(() => deactivated.assertCanAuthenticate()).toThrowError(/deactivated/);
-    });
-
-    it('deactivate twice throws InvalidStateTransitionError; reactivate un-deletes', async () => {
-      const user = await registerValid();
-      const deactivated = await user.deactivate();
+      expect(deactivated.status).toBe('DISABLED');
+      expect(deactivated.isDeleted).toBe(false);
       await expect(deactivated.deactivate()).rejects.toThrowError(/Invalid state transition/);
 
       const reactivated = await deactivated.reactivate();
-      expect(reactivated.isDeleted).toBe(false);
-      await expect(reactivated.reactivate()).rejects.toThrowError(/Invalid state transition/);
+      expect(reactivated.status).toBe('ACTIVE');
     });
 
-    it('deactivated users are excluded from default queries', async () => {
+    it('PENDING -> REJECTED is terminal; approved() from REJECTED throws', async () => {
       const user = await registerValid();
-      await user.deactivate();
+      const rejected = await user.reject();
+      expect(rejected.status).toBe('REJECTED');
+      await expect(rejected.reject()).rejects.toThrowError(/Invalid state transition/);
+      await expect(rejected.approve()).rejects.toThrowError(/Invalid state transition/);
+    });
 
-      expect(await User.findById(user.id)).toBeNull();
-      const revived = (await User.findById(user.id).setOptions({
-        withDeleted: true,
-      })) as UserDocument;
-      const back = await revived.reactivate();
-      expect(back.isActive).toBe(true);
+    it('soft delete (plugin) remains reserved for hard deletion', async () => {
+      const user = await registerValid();
+      const deleted = (await user.softDelete()) as UserDocument;
+      expect(deleted.isDeleted).toBe(true);
+      expect(() => deleted.assertCanAuthenticate()).toThrowError(AccountDisabledError);
     });
   });
 
