@@ -41,6 +41,13 @@ services/controllers; `src/config/env` beyond the composition roots
 anything below `routes/` except `routes/index.ts`; locally redeclaring a
 type that already exists in `src/types/` (see "Types & contracts").
 
+**Auth guards are the ONE middleware exception to "middleware calls
+services"**: `middleware/require-auth.ts` needs the session verifier and
+the user service, so instead of importing services it consumes their
+CONTRACT TYPES ONLY (`src/types/index.js`), injected via its factory
+`createRequireAuth(sessions, users)` from the composition root. Never
+import a service implementation file from `middleware/`.
+
 ## Types & contracts — extraction criterion (strict)
 
 Types are centralized ONLY when they are genuinely reused across layers.
@@ -149,6 +156,22 @@ This is the only endpoint allowed to skip the services layer.
    driver-level `collection.deleteMany`).
  5. Run `npm run build && npm run typecheck && npm run lint && npm test`.
 
+## Open-Closed Principle (OCP) — enforced rule
+
+**Extension adds files and registration lines; it never edits working,
+tested code.** Full rule, bad/good examples and the review checklist live in
+`docs/ocp.md` — read it before touching any dispatch code.
+
+- Any function reaching a THIRD per-feature `case`/branch must become a
+  strategy + registry (with boot-time `verify` and an unknown-key domain
+  error) before the code settles.
+- A feature PR is line-dominated by ADDITIONS: new file(s) + one
+  registration line; zero edits inside existing strategies/dispatchers.
+- Dispatch happens ONCE in the registry — callers never re-branch on the
+  discriminator; unknown keys throw, never fall through.
+- 2 stable branches stay a plain `if`: a strategy there is over-engineering
+  (see the rubric in `docs/ocp.md`).
+
 ## Complexity budget (CodeScene "Complex Method", cc ≤ 9)
 
 A function or method that mixes its STEPS with all their branching goes over
@@ -254,6 +277,11 @@ branching it can delegate.
 
 - **Prefix**: every route lives under `/api/v1`; version bump only for
   breaking changes.
+- **Route order is part of the API contract**: Express matches in mount
+  order — a router mounting `/users/:id` SWALLOWS `/users/pending` unless
+  the literal path is mounted FIRST. When two feature routers share a
+  prefix, gate literals before parameters, and note the order requirement
+  in the composition root (`routes/index.ts`).
 - **Resources are plural nouns**: `projects`, `deployment-plans`, `forks`,
   `runs`. No verbs at the collection root (`/plans/create` is banned).
 - **Reads are ALWAYS `GET`** — even "expensive" ones like analyses (a read
