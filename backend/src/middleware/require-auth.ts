@@ -63,6 +63,12 @@ export function createRequireAuth(
     // et de prendre en compte les changements de rôle.
     const user = await users.getAuthenticatedUser(userId);
 
+    // The guard is the ONLY writer of the request principal:
+    // - `res.locals.userId` — the id string, for controllers that need just it;
+    // - `res.locals.authUser` — the full DTO (id, name, email, role).
+    // Reading the principal from anywhere else (res.user, req.user...) is a
+    // route-order/typing bug.
+    res.locals.userId = user.id;
     res.locals.authUser = user;
 
     next();
