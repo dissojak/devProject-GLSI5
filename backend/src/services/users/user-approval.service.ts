@@ -3,7 +3,7 @@ import { Types } from 'mongoose';
 
 import { NotFoundError } from '../../domain/errors/index.js';
 
-import { UserRepository } from '../../repositories/user.repository.js';
+import { type UserRepository } from '../../repositories/user.repository.js';
 
 function validateId(id: string): void {
   if (!Types.ObjectId.isValid(id)) {

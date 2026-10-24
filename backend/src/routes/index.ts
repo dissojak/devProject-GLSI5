@@ -72,11 +72,7 @@ export function createApiRouter(): Router {
   // Email/password authentication
   router.use(
     '/auth',
-    createAuthRouter(
-      authService,
-      sessions,
-      env.nodeEnv === 'production',
-    ),
+    createAuthRouter(authService, sessions),
   );
 
   // GitHub OAuth authentication
@@ -90,22 +86,19 @@ export function createApiRouter(): Router {
   }),
 );
 
+  // Administrator user approval - MUST mount before the generic
+  // /admin/users routes, otherwise GET /users/pending is swallowed by
+  // GET /users/:id (id="pending" -> 400) - see docs/conventions.md.
+  router.use(
+    '/admin',
+    createUserApprovalRouter(approvalService, requireAuth),
+  );
+
   // Administrator user management
   router.use(
     '/admin',
-    createUsersRouter(
-      userService,
-      requireAuth,
-    ),
+    createUsersRouter(userService, requireAuth),
   );
-
-  router.use(
-  '/admin',
-  createUserApprovalRouter(
-    approvalService,
-    requireAuth,
-  ),
-);
 
   return router;
 }

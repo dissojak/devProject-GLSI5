@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 import { AppError } from '../domain/errors/index.js';
 import type { AuthUser } from '../types/index.js';
-import type { UserService } from '../services/users/user.service.js';
+import type { UserService } from '../types/index.js';
 
 import {
   userIdSchema,

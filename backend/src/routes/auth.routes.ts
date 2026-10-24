@@ -4,7 +4,7 @@ import { Router } from 'express';
 import type { AuthService } from '../services/auth/auth.service.js';
 import type {
   SessionTokenService,
-} from '../services/auth/session-token.service.js';
+} from '../types/index.js';
 
 import {
   createRegisterController,

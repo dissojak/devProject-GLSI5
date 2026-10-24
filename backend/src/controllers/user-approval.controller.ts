@@ -10,18 +10,15 @@ import {
 import type {
   UserApprovalService,
 } from '../services/users/user-approval.service.js';
-
-const idSchema = z.strictObject({
-  id: z.string().regex(/^[a-fA-F0-9]{24}$/),
-});
+import { userIdSchema } from '../services/users/user.schema.js';
 
 function readId(params: unknown): string {
-  const result = idSchema.safeParse(params);
+  const result = userIdSchema.safeParse(params);
 
   if (!result.success) {
     throw new AppError(
       'VALIDATION_ERROR',
-      'Invalid user ID',
+      'Invalid request data',
       z.flattenError(result.error),
     );
   }

@@ -6,7 +6,7 @@ import { AppError } from '../domain/errors/index.js';
 import type { AuthService } from '../services/auth/auth.service.js';
 import { registerSchema } from '../services/auth/register.schema.js';
 import { loginSchema } from '../services/auth/login.schema.js';
-import type { SessionTokenService } from '../services/auth/session-token.service.js';
+import type { SessionTokenService } from '../types/index.js';
 
 
 export function createRegisterController(

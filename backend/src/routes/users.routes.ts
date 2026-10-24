@@ -1,7 +1,7 @@
 
 import { Router, type RequestHandler } from 'express';
 
-import type { UserService } from '../services/users/user.service.js';
+import type { UserService } from '../types/index.js';
 
 import { requireRole } from '../middleware/require-role.js';
 

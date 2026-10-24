@@ -6,13 +6,12 @@ import {
   UnauthorizedError,
 } from '../domain/errors/index.js';
 
+// Contracts come from src/types: middleware must not import services
+// (docs/conventions.md, "Dependency direction").
 import type {
   SessionTokenService,
-} from '../services/auth/session-token.service.js';
-
-import type {
   UserService,
-} from '../services/users/user.service.js';
+} from '../types/index.js';
 
 function extractBearerToken(
   authorization: string | undefined,

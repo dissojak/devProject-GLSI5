@@ -17,7 +17,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
     "db:sync-indexes": "tsx --env-file-if-exists=.env src/scripts/sync-indexes.ts",
-    "admin:create": "tsx --env-file-if-exists=.env src/scripts/create-admin.ts"
+    "admin:create": "tsx --env-file-if-exists=.env src/scripts/create-admin.ts",
+    "db:backfill-user-status": "tsx --env-file-if-exists=.env src/scripts/backfill-user-status.ts"
   },
   "dependencies": {
     "argon2": "^0.45.1",

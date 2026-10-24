@@ -2,7 +2,6 @@
 import {
   ForbiddenError,
   NotFoundError,
-  UnauthorizedError,
   InvariantViolationError,
 } from '../../domain/errors/index.js';
 
@@ -168,6 +167,3 @@ export function createUserService(
     reactivateUser,
   };
 }
-
-export type UserService =
-  ReturnType<typeof createUserService>;

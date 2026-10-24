@@ -8,7 +8,7 @@ import type { RequestHandler, Response } from 'express';
 
 import type { GithubOAuthService } from '../services/auth/github-oauth.service.js';
 import type { GithubAuthService } from '../services/auth/github-auth.service.js';
-import type { SessionTokenService } from '../services/auth/session-token.service.js';
+import type { SessionTokenService } from '../types/index.js';
 
 const OAUTH_MAX_AGE = 5 * 60 * 1000;
 
