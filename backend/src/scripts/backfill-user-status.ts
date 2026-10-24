@@ -22,7 +22,7 @@ async function main(): Promise<void> {
   const env = getEnv();
   const logger = createLogger(env.logLevel);
 
-  await connectDatabase(env.mongodbUri);
+  await connectDatabase(env.mongodbUri, { autoIndex: true });
 
   try {
     const missingStatus = { status: { $exists: false } };

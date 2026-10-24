@@ -17,7 +17,7 @@ async function main(): Promise<void> {
   });
 
   try {
-    await connectDatabase(env.mongodbUri);
+    await connectDatabase(env.mongodbUri, { autoIndex: true });
 
     const name = (await rl.question('Nom admin : ')).trim();
     const email = (await rl.question('Email admin : ')).trim().toLowerCase();

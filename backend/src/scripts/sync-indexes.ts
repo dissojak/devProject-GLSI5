@@ -71,7 +71,9 @@ export async function runSyncIndexes(
     object
   >;
   try {
-    await connectDatabase(options.uri, { autoIndex: false });
+    // Default URI: resolved HERE (this script is a standalone composition
+    // root) - config/database.ts never reads env itself.
+    await connectDatabase(options.uri ?? getEnv().mongodbUri, { autoIndex: false });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return { failures: [`connect: ${message}`] };

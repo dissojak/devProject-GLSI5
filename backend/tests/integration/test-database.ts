@@ -22,7 +22,7 @@ export async function stopMemoryServer(): Promise<void> {
 
 export async function connectTestingModule(dbName = 'deployment_planner_test'): Promise<void> {
   const uri = await startMemoryServer();
-  await connectDatabase(`${uri}${dbName}`);
+  await connectDatabase(`${uri}${dbName}`, { autoIndex: true });
 }
 
 export async function disconnectTestingModule(): Promise<void> {
