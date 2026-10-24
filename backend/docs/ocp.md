@@ -23,10 +23,29 @@ Why this repo enforces it:
 - **Tree = feature list.** When each extension owns its file, the file tree
   documents the product.
 
-The principle is already trusted elsewhere in this codebase:
-`middleware/error-status-table.ts` (one row per error class),
-`defineStateMachine` (transitions as data), zod schemas (validation as data),
-declared model indexes. OCP generalizes that instinct.
+The principle is already trusted elsewhere in this codebase (verified by a
+whole-`src/` sweep, 2026-10-24 — zero findings):
+
+- `middleware/error-status-table.ts` (one row per error class — HTTP
+  mapping as data), `defineStateMachine` (`domain/state-machine` —
+  transitions as data), zod schemas (validation as data), declared model
+  indexes (behavior as data);
+- **per-kind rules are ARRAYS, not branches**: `GENERATED_FILE_KINDS` +
+  `KINDS_REQUIRING_PLAN` (generated-file model), `PROJECT_ENVIRONMENTS`
+  (zod `z.enum` composition). Adding a kind means extending the enum/data
+  row — never editing a dispatcher. Single invariants like
+  "DOCKERFILE requires analysis/plan" are one stable `if`, not ladders;
+- **zero `switch`/`case` statements exist in runtime `src/`** (grep-swept);
+  the only two `else if` chains are stable-forever buckets (log severity
+  in `request-logging.ts`, body-parse `SyntaxError` in `error-handler.ts`)
+  — the "plain `if`" case of the rubric in section 3;
+- when a THIRD branch per feature appears in any of those buckets, the
+  strategy + registry pattern of section 3 is mandatory.
+
+This sweep is re-verified by reviewers (and AI coding assistants) at every
+structural review: the check is mechanical — `grep -rn "switch (\|case '"
+src/` must stay empty, and every "same disease" pattern of section 2 counts
+its branches per discriminator.
 
 ## 2. Bad example (BANNED — growing dispatch chains)
 
