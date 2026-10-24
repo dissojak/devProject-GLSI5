@@ -10,6 +10,14 @@ config, Vitest.
   model / state machine, error handling, testing.
 - `docs/ocp.md` — Open-Closed Principle rule: strategy + registry pattern,
   when NOT to use it, review checklist.
+- Agent skill for AI models (any tool): `skills/backend-rules/SKILL.md`.
+  opencode already discovers it via project `.opencode/skills/` and the
+  `~/.agents/skills` / `~/.claude/skills` symlinks; other tools (Claude
+  Code, Codex, Cursor, Cline...) read `../AGENTS.md` at the repo root,
+  which points to the same file. One canonical file, one symlink per tool
+  keeps it in sync:
+    ln -sfn <repo>/backend/skills/backend-rules ~/.agents/skills/backend-rules
+    ln -sfn <repo>/backend/skills/backend-rules ~/.claude/skills/backend-rules
 - **AI coding assistants** must read `docs/conventions.md` + `docs/ocp.md`
   before generating code in this repo; their rules are enforced by ESLint
   and code review.
