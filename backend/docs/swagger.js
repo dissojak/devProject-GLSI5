@@ -28,6 +28,10 @@ export const swaggerDocument = {
             name: 'Projects',
             description: 'Gestion des projets de l’utilisateur connecté',
         },
+        {
+            name: 'Profile',
+            description: 'Profil et mot de passe de l’utilisateur connecté',
+        },
     ],
     paths: {
         '/health': {
@@ -457,6 +461,89 @@ export const swaggerDocument = {
                 },
             },
         },
+        '/api/v1/profile': {
+            get: {
+                tags: ['Profile'],
+                summary: 'Consulter mon profil',
+                description: 'Retourne le profil de l’utilisateur connecté.',
+                security: [{ bearerAuth: [] }],
+                responses: {
+                    '200': {
+                        description: 'Profil de l’utilisateur connecté',
+                        content: {
+                            'application/json': {
+                                schema: { $ref: '#/components/schemas/ProfileResponse' },
+                            },
+                        },
+                    },
+                    '401': { $ref: '#/components/responses/Unauthorized' },
+                    '403': { description: 'Compte désactivé ou non approuvé' },
+                    '404': { $ref: '#/components/responses/NotFound' },
+                },
+            },
+            patch: {
+                tags: ['Profile'],
+                summary: 'Modifier mon profil',
+                description: 'Modifie le nom et/ou l’image de profil (URL https). ' +
+                    'Envoyer avatarUrl à null supprime l’image. Au moins un champ est requis.',
+                security: [{ bearerAuth: [] }],
+                requestBody: {
+                    required: true,
+                    content: {
+                        'application/json': {
+                            schema: { $ref: '#/components/schemas/UpdateProfileInput' },
+                        },
+                    },
+                },
+                responses: {
+                    '200': {
+                        description: 'Profil mis à jour',
+                        content: {
+                            'application/json': {
+                                schema: { $ref: '#/components/schemas/ProfileResponse' },
+                            },
+                        },
+                    },
+                    '400': { $ref: '#/components/responses/ValidationError' },
+                    '401': { $ref: '#/components/responses/Unauthorized' },
+                    '403': { description: 'Compte désactivé ou non approuvé' },
+                    '404': { $ref: '#/components/responses/NotFound' },
+                },
+            },
+        },
+        '/api/v1/profile/password': {
+            post: {
+                tags: ['Profile'],
+                summary: 'Changer mon mot de passe',
+                description: 'Vérifie le mot de passe actuel puis enregistre le nouveau. ' +
+                    'Les comptes GitHub sans mot de passe local reçoivent 403.',
+                security: [{ bearerAuth: [] }],
+                requestBody: {
+                    required: true,
+                    content: {
+                        'application/json': {
+                            schema: { $ref: '#/components/schemas/ChangePasswordInput' },
+                        },
+                    },
+                },
+                responses: {
+                    '200': {
+                        description: 'Mot de passe modifié',
+                        content: {
+                            'application/json': {
+                                schema: { $ref: '#/components/schemas/ChangePasswordResponse' },
+                            },
+                        },
+                    },
+                    '400': { $ref: '#/components/responses/ValidationError' },
+                    '401': { $ref: '#/components/responses/Unauthorized' },
+                    '403': {
+                        description: 'Mot de passe actuel incorrect, compte sans mot de passe local ou compte désactivé',
+                    },
+                    '404': { $ref: '#/components/responses/NotFound' },
+                },
+            },
+        },
         '/api/v1/projects': {
             post: {
                 tags: ['Projects'],
@@ -755,6 +842,75 @@ export const swaggerDocument = {
                         type: 'array',
                         items: { $ref: '#/components/schemas/Project' },
                     },
+                },
+            },
+            Profile: {
+                type: 'object',
+                properties: {
+                    id: { type: 'string', example: '507f1f77bcf86cd799439011' },
+                    name: { type: 'string', example: 'Ahmed Ben Ali' },
+                    email: { type: 'string', format: 'email', example: 'ahmed@example.com' },
+                    role: { type: 'string', example: 'DEVELOPER' },
+                    avatarUrl: {
+                        type: 'string',
+                        format: 'uri',
+                        nullable: true,
+                        example: 'https://cdn.example.com/avatars/ahmed.png',
+                    },
+                    lastLoginAt: { type: 'string', format: 'date-time', nullable: true },
+                },
+            },
+            ProfileResponse: {
+                type: 'object',
+                properties: {
+                    message: { type: 'string', example: 'Profile retrieved successfully' },
+                    data: { $ref: '#/components/schemas/Profile' },
+                },
+            },
+            UpdateProfileInput: {
+                type: 'object',
+                additionalProperties: false,
+                minProperties: 1,
+                properties: {
+                    name: { type: 'string', minLength: 2, maxLength: 100, example: 'Ahmed Ben Ali' },
+                    avatarUrl: {
+                        type: 'string',
+                        format: 'uri',
+                        nullable: true,
+                        maxLength: 2048,
+                        description: 'URL https de l’image, ou null pour la supprimer',
+                        example: 'https://cdn.example.com/avatars/ahmed.png',
+                    },
+                },
+            },
+            ChangePasswordInput: {
+                type: 'object',
+                additionalProperties: false,
+                required: ['currentPassword', 'newPassword'],
+                properties: {
+                    currentPassword: {
+                        type: 'string',
+                        format: 'password',
+                        maxLength: 128,
+                        writeOnly: true,
+                        example: 'Test@123456',
+                    },
+                    newPassword: {
+                        type: 'string',
+                        format: 'password',
+                        minLength: 8,
+                        maxLength: 128,
+                        writeOnly: true,
+                        description: 'Doit être différent du mot de passe actuel',
+                        example: 'Nouveau@123456',
+                    },
+                },
+            },
+            ChangePasswordResponse: {
+                type: 'object',
+                properties: {
+                    message: { type: 'string', example: 'Password changed successfully' },
+                    data: { type: 'object', nullable: true, example: null },
                 },
             },
             RegisterResponse: {

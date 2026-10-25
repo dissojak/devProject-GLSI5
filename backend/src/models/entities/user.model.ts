@@ -37,6 +37,7 @@ export interface UserFields {
   role: UserRole;
   status: AccountStatus;
   lastLoginAt?: Date | null;
+  avatarUrl?: string | null;
 }
 
 export interface UserStatics {
@@ -47,8 +48,7 @@ export interface UserMethods extends SoftDeletableMethods {
   setPassword(plain: string): Promise<UserDocument>;
   verifyPassword(plain: string): Promise<boolean>;
   recordLogin(): Promise<UserDocument>;
-  updateProfile(patch: { name?: string }): Promise<UserDocument>;
-  changeRole(newRole: UserRole): Promise<UserDocument>;
+  updateProfile(patch: { name?: string; avatarUrl?: string | null }): Promise<UserDocument>;  changeRole(newRole: UserRole): Promise<UserDocument>;
   deactivate(): Promise<UserDocument>;
   reactivate(): Promise<UserDocument>;
   isAdmin(): boolean;
@@ -69,6 +69,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const NAME_MIN = 2;
 const NAME_MAX = 100;
 const PASSWORD_MIN = 8;
+const AVATAR_URL_MAX = 2048;
 
 const userSchema = new Schema<
   UserFields,
@@ -101,6 +102,7 @@ const userSchema = new Schema<
     passwordHash: { type: String, required: false, select: false },
     role: { type: String, required: true, enum: USER_ROLES, default: 'DEVELOPER' },
     lastLoginAt: { type: Date, default: null },
+    avatarUrl: { type: String, required: false, trim: true, maxlength: AVATAR_URL_MAX, default: null },
     status: {
     type: String,
     enum: ACCOUNT_STATUSES,
@@ -185,12 +187,14 @@ userSchema.methods.recordLogin = async function recordLogin(
 
 userSchema.methods.updateProfile = async function updateProfile(
   this: UserDocument,
-  patch: { name?: string },
+  patch: { name?: string; avatarUrl?: string | null },
 ): Promise<UserDocument> {
   if (patch.name !== undefined) {
     this.set('name', patch.name.trim());
   }
-
+   if (patch.avatarUrl !== undefined) {
+    this.set('avatarUrl', patch.avatarUrl);
+  }
   return this.save() as unknown as Promise<UserDocument>;
 };
 

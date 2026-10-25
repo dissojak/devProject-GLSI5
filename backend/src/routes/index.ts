@@ -8,6 +8,7 @@ import { createGithubAuthRouter } from './github-auth.routes.js';
 import { createProjectRouter } from './project.routes.js';
 import { createUsersRouter } from './users.routes.js';
 import { createUserApprovalRouter } from './user-approval.routes.js';
+import { createProfileRouter } from './profile.routes.js';
 // Middleware factories
 import { createRequireAuth } from '../middleware/require-auth.js';
 
@@ -15,6 +16,7 @@ import { createRequireAuth } from '../middleware/require-auth.js';
 import { UserRepository } from '../repositories/user.repository.js';
 import { AuthIdentityRepository } from '../repositories/auth-identity.repository.js';
 import { ProjectRepository } from '../repositories/project.repository.js';
+import { UserCredentialsRepository } from '../repositories/user-credentials.repository.js';
 
 // Functional service factories
 import { createAuthService } from '../services/auth/auth.service.js';
@@ -24,6 +26,7 @@ import { createSessionTokenService } from '../services/auth/session-token.servic
 import { createProjectService } from '../services/project/project.service.js';
 import { createUserService } from '../services/users/user.service.js';
 import { createUserApprovalService } from '../services/users/user-approval.service.js';
+import { createProfileService } from '../services/profile/profile.service.js';
 
 /**
  * API composition root.
@@ -43,6 +46,7 @@ export function createApiRouter(): Router {
   const users = new UserRepository();
   const identities = new AuthIdentityRepository();
   const projects = new ProjectRepository();
+  const credentialUsers = new UserCredentialsRepository();
 
   // Shared services
   const sessions = createSessionTokenService(env.sessionSecret);
@@ -50,7 +54,7 @@ export function createApiRouter(): Router {
   const userService = createUserService(users);
   const approvalService = createUserApprovalService(users);
   const projectService = createProjectService(projects);
-
+  const profileService = createProfileService(users, credentialUsers);
   const githubOAuthService = createGithubOAuthService(
     env.githubClientId,
     env.githubClientSecret,
@@ -105,6 +109,7 @@ export function createApiRouter(): Router {
 
   // User project management
   router.use('/projects', createProjectRouter(projectService, requireAuth));
-
+  // User profile management
+  router.use(createProfileRouter(profileService, requireAuth));  
   return router;
 }
