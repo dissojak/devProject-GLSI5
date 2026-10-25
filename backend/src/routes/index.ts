@@ -8,6 +8,7 @@ import { createGithubAuthRouter } from './github-auth.routes.js';
 import { createProjectRouter } from './project.routes.js';
 import { createUsersRouter } from './users.routes.js';
 import { createUserApprovalRouter } from './user-approval.routes.js';
+import { createProfileRouter } from './profile.routes.js';
 // Middleware factories
 import { createRequireAuth } from '../middleware/require-auth.js';
 
@@ -24,6 +25,7 @@ import { createSessionTokenService } from '../services/auth/session-token.servic
 import { createProjectService } from '../services/project/project.service.js';
 import { createUserService } from '../services/users/user.service.js';
 import { createUserApprovalService } from '../services/users/user-approval.service.js';
+import { createProfileService } from '../services/profile/profile.service.js';
 
 /**
  * API composition root.
@@ -50,7 +52,7 @@ export function createApiRouter(): Router {
   const userService = createUserService(users);
   const approvalService = createUserApprovalService(users);
   const projectService = createProjectService(projects);
-
+  const profileService = createProfileService(users);
   const githubOAuthService = createGithubOAuthService(
     env.githubClientId,
     env.githubClientSecret,
@@ -105,6 +107,9 @@ export function createApiRouter(): Router {
 
   // User project management
   router.use('/projects', createProjectRouter(projectService, requireAuth));
+
+  // Self-scoped profile (self-vs-admin read: mounted at /profile)
+  router.use('/profile', createProfileRouter(profileService, requireAuth));
 
   return router;
 }
