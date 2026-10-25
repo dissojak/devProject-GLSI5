@@ -1,3 +1,5 @@
+"use client";
+
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { DashboardTopNav } from "@/components/dashboard/top-nav";
 import { DashboardView } from "@/components/dashboard/dashboard-view";

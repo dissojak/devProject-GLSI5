@@ -1,15 +1,7 @@
-import type { Metadata } from "next";
-import { ProjectsGuard } from "@/components/dashboard/projects-guard";
-import { ProjectsPage } from "@/components/dashboard/projects-page";
+"use client";
 
-export const metadata: Metadata = {
-  title: "Projects",
-};
+import { ProjectsGuard } from "@/components/dashboard/projects-guard";
 
 export default function Projects() {
-  return (
-    <ProjectsGuard>
-      <ProjectsPage />
-    </ProjectsGuard>
-  );
+  return <ProjectsGuard />;
 }

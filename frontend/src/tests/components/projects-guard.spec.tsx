@@ -13,14 +13,14 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace }),
 }));
 
-const MARKER_TEXT = "telemetry content";
+vi.mock("@/components/dashboard/projects-page", () => ({
+  ProjectsPage: () => <p>guarded content</p>,
+}));
 
 function renderGuard() {
   return render(
     <ReduxProvider>
-      <ProjectsGuard>
-        <p>{MARKER_TEXT}</p>
-      </ProjectsGuard>
+      <ProjectsGuard />
     </ReduxProvider>,
   );
 }
@@ -41,7 +41,7 @@ describe("projects guard", () => {
   it("redirects an anonymous visitor to the login route and holds the content", async () => {
     renderGuard();
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
-    expect(screen.queryByText(MARKER_TEXT)).toBeNull();
+    expect(screen.queryByText("guarded content")).toBeNull();
   });
 
   it("renders the guarded content once a stored session is restored", async () => {
@@ -53,7 +53,7 @@ describe("projects guard", () => {
       }),
     );
     renderGuard();
-    await screen.findByText(MARKER_TEXT);
+    await screen.findByText("guarded content");
     expect(replace).not.toHaveBeenCalled();
   });
 });

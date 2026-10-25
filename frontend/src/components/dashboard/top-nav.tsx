@@ -1,3 +1,5 @@
+"use client";
+
 import {
   DASHBOARD_CRUMB_ROW,
   DASHBOARD_SEARCH_ROW,

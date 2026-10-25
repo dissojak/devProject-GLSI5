@@ -28,7 +28,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
         precedence="default"
       />
-      <body className="relative flex min-h-full flex-col justify-between overflow-x-hidden bg-navy text-foam selection:bg-ice/30 selection:text-foam">
+      <body
+        suppressHydrationWarning
+        className="relative flex min-h-full flex-col justify-between overflow-x-hidden bg-navy text-foam selection:bg-ice/30 selection:text-foam"
+      >
         <SiteBackground />
         <ReduxProvider>{children}</ReduxProvider>
       </body>
