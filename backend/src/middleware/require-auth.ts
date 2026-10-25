@@ -13,25 +13,9 @@ import type {
   UserService,
 } from '../types/index.js';
 
-function extractBearerToken(
-  authorization: string | undefined,
-): string {
-  if (!authorization) {
-    throw new UnauthorizedError(
-      'Bearer token required',
-    );
-  }
-
-  const match = /^Bearer ([^\s]+)$/i.exec(authorization);
-
-  if (!match?.[1]) {
-    throw new UnauthorizedError(
-      'Invalid Authorization header',
-    );
-  }
-
-  return match[1];
-}
+import {
+  extractBearerToken,
+} from '../shared/security/bearer-token.js';
 
 export function createRequireAuth(
   sessions: SessionTokenService,

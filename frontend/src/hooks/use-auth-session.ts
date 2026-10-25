@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import type { AuthAccount } from "@/types/auth";
 import { useAppSelector, useAppDispatch } from "@/hooks/redux";
-import { sessionStarted } from "@/store/auth-session";
+import { sessionCleared, sessionStarted } from "@/store/auth-session";
 import type { AuthSessionState } from "@/store/auth-session";
 
 export function useAuthSession(): AuthSessionState {
@@ -16,4 +16,11 @@ export function useStartSession(): (session: { accessToken: string; user: AuthAc
     },
     [dispatch],
   );
+}
+
+export function useSessionClear(): () => void {
+  const dispatch = useAppDispatch();
+  return useCallback(() => {
+    dispatch(sessionCleared());
+  }, [dispatch]);
 }

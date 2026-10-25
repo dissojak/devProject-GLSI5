@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { Button } from "@/shared/button";
-import { GitHubIcon } from "@/shared/icons/github-icon";
+import { GithubButton } from "@/components/auth/github-button";
 import { cn } from "@/utils/class-names";
 import type { AuthPageId } from "@/types/navigation";
 
@@ -46,10 +45,7 @@ export function AuthCard({
           <span className="text-xs font-medium uppercase text-mist">or</span>
           <div className="h-px flex-1 bg-steel/70" />
         </div>
-        <Button variant="teal" className="h-12 w-full gap-3 text-sm">
-          <GitHubIcon className="h-4 w-4 shrink-0 fill-current text-foam" />
-          <span>Continue with GitHub</span>
-        </Button>
+        <GithubButton />
         <div className={cn("text-center text-xs text-mist", tone.note)}>
           <span>{footerMessage} </span>
           <Link

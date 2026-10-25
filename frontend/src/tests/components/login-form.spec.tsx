@@ -204,3 +204,57 @@ describe("LoginForm against the backend", () => {
     expect((PASSWORD_INPUT() as HTMLInputElement).disabled).toBe(true);
   });
 });
+
+describe("LoginForm with a redirected GitHub callback", () => {
+  afterEach(() => {
+    window.history.replaceState(null, "", "/");
+  });
+
+  it("shows the pending-approval banner for a ?github=FORBIDDEN redirect", () => {
+    window.history.replaceState(null, "", "/?github=FORBIDDEN");
+    renderLoginForm();
+
+    expect(
+      screen.getByText(
+        "Your account is awaiting administrator approval, or has been disabled.",
+      ),
+    ).toBeDefined();
+  });
+
+  it("shows the deactivated banner for a ?github=ACCOUNT_DISABLED redirect", () => {
+    window.history.replaceState(null, "", "/?github=ACCOUNT_DISABLED");
+    renderLoginForm();
+
+    expect(
+      screen.getByText(
+        "Your account has been deactivated. Contact an administrator.",
+      ),
+    ).toBeDefined();
+  });
+
+  it("shows the github-conflict banner for a ?github=CONFLICT redirect", () => {
+    window.history.replaceState(null, "", "/?github=CONFLICT");
+    renderLoginForm();
+
+    expect(
+      screen.getByText("A different GitHub account is already linked to this email."),
+    ).toBeDefined();
+  });
+
+  it("shows the unexpected banner for an unknown callback code", () => {
+    window.history.replaceState(null, "", "/?github=THE_UNKNOWN");
+    renderLoginForm();
+
+    expect(screen.getByText("Something went wrong. Please try again.")).toBeDefined();
+  });
+
+  it("renders no banner when the login page was opened directly", () => {
+    window.history.replaceState(null, "", "/");
+    renderLoginForm();
+
+    expect(
+      screen.queryByText("Your account is awaiting administrator approval, or has been disabled."),
+    ).toBeNull();
+    expect(screen.queryByText("Something went wrong. Please try again.")).toBeNull();
+  });
+});

@@ -6,11 +6,25 @@ import {
 
 import type { RequestHandler, Response } from 'express';
 
+import { AppError } from '../domain/errors/index.js';
 import type { GithubOAuthService } from '../services/auth/github-oauth.service.js';
 import type { GithubAuthService } from '../services/auth/github-auth.service.js';
-import type { SessionTokenService } from '../types/index.js';
+import type { AuthUser, SessionTokenService } from '../types/index.js';
 
 const OAUTH_MAX_AGE = 5 * 60 * 1000;
+
+/**
+ * Domain codes the callback converts into a redirect to the frontend with
+ * `?github=<code>` — the frontend maps each code to its alert banner. Data
+ * table: adding an outcome = one row here, never new branching. Errors that
+ * are NOT in this set belong to the central error handler, like everywhere
+ * else.
+ */
+const BROWSER_REDIRECT_CODES = new Set<string>([
+  'CONFLICT',
+  'ACCOUNT_DISABLED',
+  'FORBIDDEN',
+]);
 
 /**
  * One shared dependency bag for the GitHub OAuth feature. Built ONCE by
@@ -22,6 +36,7 @@ export interface GithubAuthDeps {
   oauth: GithubOAuthService;
   auth: GithubAuthService;
   sessions: SessionTokenService;
+  frontendUrl: string;
   secureCookies: boolean;
 }
 
@@ -58,6 +73,37 @@ function clearOAuthCookies(res: Response, secureCookies: boolean): void {
 interface OAuthCallbackData {
   code: string;
   verifier: string;
+}
+
+/**
+ * Browser handoff (https://github.com/... -> callback -> the React app):
+ * the callback is a browser navigation, so the success response is a 302 to
+ * the frontend landing on /session with the session in the URL fragment
+ * (fragments never reach the server or the referrer). The frontend parses
+ * this exact field set under standalone apps — field names live in its
+ * parseGithubHandoff util.
+ */
+function buildHandoffRedirect(
+  frontendUrl: string,
+  accessToken: string,
+  user: AuthUser,
+): string {
+  const handoff = new URLSearchParams({
+    access_token: accessToken,
+    user_id: user.id,
+    user_name: user.name,
+    user_email: user.email,
+    user_role: user.role,
+  });
+
+  return `${frontendUrl}/session#${handoff.toString()}`;
+}
+
+function buildErrorRedirect(
+  frontendUrl: string,
+  code: string,
+): string {
+  return `${frontendUrl}/?github=${encodeURIComponent(code)}`;
 }
 
 function getOAuthCallbackData(
@@ -114,6 +160,11 @@ export function createGithubCallbackController(
     // Supprimer les données temporaires OAuth
     clearOAuthCookies(res, deps.secureCookies);
 
+    // La réponse part en navigation navigateur : jamais de cache.
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+
     const callbackData = getOAuthCallbackData(
       state,
       code,
@@ -122,47 +173,36 @@ export function createGithubCallbackController(
     );
 
     if (callbackData === null) {
-      res.status(400).json({
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Invalid OAuth state or callback',
-        },
-      });
+      res.redirect(buildErrorRedirect(deps.frontendUrl, 'INVALID_STATE'));
       return;
     }
 
-    // Échanger le code OAuth et récupérer le profil
-    const profile = await deps.oauth.getProfile(
-      callbackData.code,
-      callbackData.verifier,
-    );
+    let user: AuthUser;
 
-    // Retrouver ou créer le compte MongoDB
-    const user = await deps.auth.login(profile);
+    try {
+      const profile = await deps.oauth.getProfile(
+        callbackData.code,
+        callbackData.verifier,
+      );
 
-    // Générer le JWT de DeploymentPlanner AI
+      user = await deps.auth.login(profile);
+    } catch (error) {
+      // Transport adapter for the BROWSER hop: the browser that lands here
+      // cannot read a JSON error body, so known account outcomes are turned
+      // into a redirect carrying their stable code. This try/catch exists
+      // ONLY for that transport; every other error keeps bubbling to the
+      // central error handler (Express 5 forwards async rejections).
+      if (error instanceof AppError && BROWSER_REDIRECT_CODES.has(error.code)) {
+        res.redirect(buildErrorRedirect(deps.frontendUrl, error.code));
+        return;
+      }
+
+      throw error;
+    }
+
     const accessToken = await deps.sessions.create(user.id);
 
-    // Empêcher la mise en cache de la réponse sensible
-    res.setHeader('Cache-Control', 'no-store');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Referrer-Policy', 'no-referrer');
-
-    // AUCUN cookie de session n'est créé
-    res.status(200).json({
-      message: 'GitHub authentication successful',
-
-      data: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
-
-      accessToken,
-      tokenType: 'Bearer',
-      expiresIn: 3600,
-    });
+    res.redirect(buildHandoffRedirect(deps.frontendUrl, accessToken, user));
   };
 }
 

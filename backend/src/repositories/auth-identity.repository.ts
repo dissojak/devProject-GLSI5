@@ -1,6 +1,8 @@
 
 import type { ClientSession, Types } from 'mongoose';
 
+import { ConflictError } from '../domain/errors/index.js';
+
 import {
   AuthIdentity,
 } from '../models/entities/index.js';
@@ -13,10 +15,18 @@ export class AuthIdentityRepository {
     }).exec();
   }
 
+  /** The GitHub identity an account already owns, whatever the GitHub id. */
+  async findUserGithubIdentity(userId: Types.ObjectId | string) {
+    return AuthIdentity.findOne({
+      provider: 'github',
+      userId,
+    }).exec();
+  }
+
   async createGithubIdentity(
-    userId: Types.ObjectId,
+    userId: Types.ObjectId | string,
     githubId: string,
-    session: ClientSession,
+    session?: ClientSession,
   ) {
     const [identity] = await AuthIdentity.create(
       [{
@@ -24,7 +34,7 @@ export class AuthIdentityRepository {
         provider: 'github',
         providerUserId: githubId,
       }],
-      { session },
+      session ? { session } : undefined,
     );
 
     if (!identity) {
@@ -32,5 +42,22 @@ export class AuthIdentityRepository {
     }
 
     return identity;
+  }
+
+  /**
+   * Rejects re-linking a DIFFERENT GitHub account to an account that already
+   * owns one. Called by the service before the (safe) insert.
+   */
+  async assertNoConflictingGithubIdentity(
+    userId: Types.ObjectId | string,
+    githubId: string,
+  ): Promise<void> {
+    const owned = await this.findUserGithubIdentity(userId);
+
+    if (owned && owned.providerUserId !== githubId) {
+      throw new ConflictError(
+        'A different GitHub account is already linked to this email.',
+      );
+    }
   }
 }

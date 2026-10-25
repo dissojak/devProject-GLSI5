@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { ApiErrorBody } from "@/types/api";
 import {
+  githubCallbackAlert,
   loginAlertKind,
   parseApiError,
   parseAuthSuccess,
+  parseGithubHandoff,
   signupFieldErrorsFromApiError,
 } from "@/utils/auth-responses";
 
@@ -76,6 +78,47 @@ describe("parseAuthSuccess", () => {
   it("rejects malformed users and payloads", () => {
     expect(parseAuthSuccess(null)).toEqual({ user: null, accessToken: null });
     expect(parseAuthSuccess({ data: { id: "u1" } }).user).toBeNull();
+  });
+});
+
+describe("githubCallbackAlert", () => {
+  it("maps backend callback redirect codes to banner kinds", () => {
+    expect(githubCallbackAlert("FORBIDDEN")).toBe("pending-approval");
+    expect(githubCallbackAlert("ACCOUNT_DISABLED")).toBe("account-deactivated");
+    expect(githubCallbackAlert("CONFLICT")).toBe("github-conflict");
+  });
+
+  it("shows the unexpected banner for unknown callback codes", () => {
+    expect(githubCallbackAlert("INVALID_STATE")).toBe("unexpected");
+    expect(githubCallbackAlert("")).toBe("unexpected");
+  });
+
+  it("returns null when the page was not reached by a callback redirect", () => {
+    expect(githubCallbackAlert(null)).toBeNull();
+  });
+});
+
+describe("parseGithubHandoff", () => {
+  it("reads the callback fragment handoff into a session payload", () => {
+    expect(
+      parseGithubHandoff(
+        "#access_token=TOKEN&user_id=u1&user_name=Ada&user_email=ada%40example.com&user_role=DEVELOPER",
+      ),
+    ).toEqual({
+      user: { id: "u1", name: "Ada", email: "ada@example.com", role: "DEVELOPER" },
+      accessToken: "TOKEN",
+    });
+  });
+
+  it("returns null without the fragment or with a missing field", () => {
+    expect(parseGithubHandoff("")).toBeNull();
+    expect(parseGithubHandoff("no-hash")).toBeNull();
+    expect(parseGithubHandoff("#user_id=u1")).toBeNull();
+    expect(
+      parseGithubHandoff(
+        "#access_token=TOKEN&user_id=u1&user_name=Ada&user_email=ada@example.com&user_role=",
+      ),
+    ).toBeNull();
   });
 });
 

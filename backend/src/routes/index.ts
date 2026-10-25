@@ -74,7 +74,7 @@ export function createApiRouter(): Router {
   // Email/password authentication
   router.use(
     '/auth',
-    createAuthRouter(authService, sessions),
+    createAuthRouter(authService, sessions, requireAuth),
   );
 
   // GitHub OAuth authentication
@@ -84,6 +84,7 @@ export function createApiRouter(): Router {
       oauth: githubOAuthService,
       auth: githubAuthService,
       sessions,
+      frontendUrl: env.frontendUrl,
       secureCookies: env.nodeEnv === 'production',
     }),
   );

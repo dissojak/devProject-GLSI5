@@ -22,3 +22,8 @@ export const SESSION_BACK_LINK: NavLink = {
   label: "Back to login",
   href: "/",
 };
+
+export const SESSION_LOGOUT_CTA = {
+  id: "session-logout-cta",
+  label: "Log out",
+} as const;

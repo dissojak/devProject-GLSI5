@@ -174,9 +174,12 @@ export const swaggerDocument = {
     summary: 'Callback GitHub OAuth',
 
     description:
-      'Finalise GitHub OAuth et retourne un JWT Bearer signé par DeploymentPlanner AI. ' +
-      'Le token OAuth GitHub reste côté serveur. La réponse contient accessToken, ' +
-      'tokenType, expiresIn et le profil de l’utilisateur. ' +
+      'Finalise GitHub OAuth pour le navigateur. En cas de succès, la réponse ' +
+      'redirige vers `${FRONTEND_URL}/session#access_token=...&user_id=...` ' +
+      '(le fragment est lu par le frontend). En cas de compte refusé, ' +
+      'désactivé ou en conflit d\'email, la réponse redirige vers ' +
+      '`/?github=<code>` (FORBIDDEN, ACCOUNT_DISABLED, CONFLICT, ' +
+      'INVALID_STATE) pour que le frontend affiche son bandeau. ' +
       'Démarrer le flux via /api/v1/auth/github dans un navigateur; ' +
       'ne pas appeler manuellement le callback.',
 
@@ -196,44 +199,13 @@ export const swaggerDocument = {
     ],
 
     responses: {
-      '200': {
-        description: 'Authentification GitHub réussie',
-        content: {
-          'application/json': {
-            schema: {
-              $ref: '#/components/schemas/LoginResponse',
-            },
-            example: {
-              message: 'GitHub authentication successful',
-              data: {
-                id: '507f1f77bcf86cd799439011',
-                name: 'GitHub Developer',
-                email: 'developer@example.com',
-                role: 'DEVELOPER',
-              },
-              accessToken: 'eyJhbGciOiJIUzI1NiJ9...',
-              tokenType: 'Bearer',
-              expiresIn: 3600,
-            },
-          },
-        },
-      },
-
-      '400': {
-        description: 'OAuth state ou callback invalide',
-      },
-
-      '401': {
-        description: 'Authentification refusée',
-      },
-
-      '409': {
-        description: 'Compte existant nécessitant une liaison explicite',
+      '302': {
+        description:
+          'Redirection vers le frontend : session en fragment ou "?github=<code>"',
       },
     },
   },
 },
-
 
 '/api/v1/admin/users': {
   get: {

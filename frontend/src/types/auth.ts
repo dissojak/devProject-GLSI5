@@ -29,6 +29,7 @@ export type LoginAlertKind =
   | "invalid-credentials"
   | "account-deactivated"
   | "pending-approval"
+  | "github-conflict"
   | "unexpected";
 
 export interface AuthAlertBanner {

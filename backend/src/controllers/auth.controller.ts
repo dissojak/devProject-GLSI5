@@ -6,6 +6,7 @@ import { parseOrThrow } from '../shared/validation/request-validation.js';
 import { registerSchema } from '../services/auth/register.schema.js';
 import { loginSchema } from '../services/auth/login.schema.js';
 import type { SessionTokenService } from '../types/index.js';
+import { extractBearerToken } from '../shared/security/bearer-token.js';
 
 
 export function createRegisterController(
@@ -46,6 +47,27 @@ export function createLoginController(
       accessToken,
       tokenType: 'Bearer',
       expiresIn: 3600,
+    });
+  };
+}
+
+/**
+ * Logout = deny-list the presented access token server-side (db-backed,
+ * takes effect on the NEXT guarded call); the frontend still clears its
+ * own session state.
+ */
+export function createLogoutController(
+  sessions: SessionTokenService,
+): RequestHandler {
+  return async (req, res) => {
+    const token = extractBearerToken(req.headers.authorization);
+
+    await sessions.revoke(token);
+
+    res.setHeader('Cache-Control', 'no-store');
+
+    res.status(200).json({
+      message: 'Logged out successfully',
     });
   };
 }

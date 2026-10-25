@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AUTH_ALERTS } from "@/data/auth-alerts";
+import { GITHUB_BUTTON, GITHUB_REDIRECT_PARAM } from "@/data/auth-github";
 import { SESSION_SUMMARY, SESSION_SUMMARY_FIELDS, SESSION_BACK_LINK } from "@/data/session";
 import {
   SIGNUP_CONFIRMATION,
@@ -11,6 +12,7 @@ describe("auth alert banners", () => {
   it("declares an alert row for every login failure kind", () => {
     expect(Object.keys(AUTH_ALERTS).sort()).toEqual([
       "account-deactivated",
+      "github-conflict",
       "invalid-credentials",
       "pending-approval",
       "unexpected",
@@ -36,12 +38,29 @@ describe("auth alert banners", () => {
       icon: "schedule",
       message: "Your account is awaiting administrator approval, or has been disabled.",
     });
+    expect(AUTH_ALERTS["github-conflict"]).toEqual({
+      id: "github-conflict",
+      tone: "crimson",
+      icon: "error",
+      message: "A different GitHub account is already linked to this email.",
+    });
     expect(AUTH_ALERTS.unexpected).toEqual({
       id: "unexpected",
       tone: "crimson",
       icon: "error",
       message: "Something went wrong. Please try again.",
     });
+  });
+});
+
+describe("github account choice", () => {
+  it("declares the OAuth start path and the callback redirect query param", () => {
+    expect(GITHUB_BUTTON).toEqual({
+      id: "github",
+      label: "Continue with GitHub",
+      path: "/auth/github",
+    });
+    expect(GITHUB_REDIRECT_PARAM).toBe("github");
   });
 });
 

@@ -28,6 +28,35 @@ async function postJson(path: string, body: unknown): Promise<AuthApiResult> {
   }
 }
 
+async function postSignedJson(
+  path: string,
+  token: string,
+): Promise<AuthApiResult> {
+  try {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    let payload: unknown = null;
+    try {
+      payload = await response.json();
+    } catch {
+      payload = null;
+    }
+    return {
+      kind: "http",
+      httpOk: response.ok,
+      status: response.status,
+      payload,
+    };
+  } catch {
+    return { kind: "network" };
+  }
+}
+
 export function useAccountLogin(): {
   pending: boolean;
   login: (values: LoginFormValues) => Promise<AuthApiResult>;
@@ -65,4 +94,20 @@ export function useAccountSignup(): {
     }
   }, []);
   return { pending, signup };
+}
+
+export function useAccountLogout(): {
+  pending: boolean;
+  logout: (token: string) => Promise<AuthApiResult>;
+} {
+  const [pending, setPending] = useState(false);
+  const logout = useCallback(async (token: string): Promise<AuthApiResult> => {
+    setPending(true);
+    try {
+      return await postSignedJson("/auth/logout", token);
+    } finally {
+      setPending(false);
+    }
+  }, []);
+  return { pending, logout };
 }

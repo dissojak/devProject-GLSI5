@@ -126,3 +126,10 @@ export {
   type AuthIdentityDocument,
   type AuthIdentityFields,
 } from './auth-identity.model.js';
+
+export {
+  SESSION_REVOCATION_MODEL_NAME,
+  SessionRevocation,
+  type SessionRevocationDocument,
+  type SessionRevocationFields,
+} from './session-revocation.model.js';

@@ -23,6 +23,12 @@ export const AUTH_ALERTS: Record<LoginAlertKind, AuthAlertBanner> = {
     icon: "schedule",
     message: "Your account is awaiting administrator approval, or has been disabled.",
   },
+  "github-conflict": {
+    id: "github-conflict",
+    tone: "crimson",
+    icon: "error",
+    message: "A different GitHub account is already linked to this email.",
+  },
   unexpected: {
     id: "unexpected",
     tone: "crimson",

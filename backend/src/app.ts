@@ -16,7 +16,9 @@ import { requestLogging } from './middleware/request-logging.js';
 import { healthRouter } from './routes/health.routes.js';
 import { createApiRouter } from './routes/index.js';
 
-import { swaggerDocument } from '../docs/swagger.js';
+// Runtime-documentation module: lives under src/ so `npm run build` keeps a
+// src rootDir (see tsconfig.build.json); docs/ is for Markdown, not compiled TS.
+import { swaggerDocument } from './swagger.js';
 
 /**
  * App factory: assembles middleware and routes WITHOUT listening and WITHOUT

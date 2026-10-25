@@ -1,7 +1,6 @@
 import mongoose from 'mongoose';
 
 import {
-  ConflictError,
   ForbiddenError,
   UnauthorizedError,
 } from '../../domain/errors/index.js';
@@ -56,16 +55,32 @@ export function createGithubAuthService(
       return user;
     }
 
-    // 2. Vérifier si l'email existe déjà
+    // 2. Same verified email as a local password account: GitHub becomes an
+    //    ADDITIONAL sign-in method on that account (GitHub has already
+    //    verified the email owner), then the same status gate as password
+    //    login applies below.
     const existingUser = await users.findByEmail(
       profile.email,
       { withDeleted: true },
     );
 
     if (existingUser) {
-      throw new ConflictError(
-        'Email already registered. Sign in locally to link GitHub.',
+      await identities.assertNoConflictingGithubIdentity(
+        existingUser.id,
+        profile.githubId,
       );
+
+      await identities.createGithubIdentity(
+        existingUser.id,
+        profile.githubId,
+      );
+
+      // Vérifier le statut AVANT de produire un JWT
+      existingUser.assertCanAuthenticate();
+
+      await existingUser.recordLogin();
+
+      return existingUser;
     }
 
     // 3. Créer le développeur en attente

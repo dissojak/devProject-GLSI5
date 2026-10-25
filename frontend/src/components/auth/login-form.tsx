@@ -1,10 +1,11 @@
 "use client";
 
 import type { ChangeEvent, FormEvent } from "react";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import type { AuthAlertBanner, LoginFormValues } from "@/types/auth";
 import { AUTH_ALERTS } from "@/data/auth-alerts";
+import { GITHUB_REDIRECT_PARAM } from "@/data/auth-github";
 import { SESSION_ROUTE } from "@/data/navigation";
 import { useAccountLogin } from "@/hooks/use-auth-request";
 import { useStartSession } from "@/hooks/use-auth-session";
@@ -14,6 +15,7 @@ import { Button } from "@/shared/button";
 import { MaterialIcon } from "@/shared/material-icon";
 import { TextField } from "@/shared/text-field";
 import {
+  githubCallbackAlert,
   loginAlertKind,
   parseApiError,
   parseAuthSuccess,
@@ -27,6 +29,21 @@ interface LoginFormProps {
 const INVALID_LOGIN = AUTH_ALERTS["invalid-credentials"];
 const UNEXPECTED_LOGIN = AUTH_ALERTS.unexpected;
 
+const subscribeToNothing = () => () => {};
+
+/**
+ * The backend callback redirects back with `?github=<code>`; derived during
+ * render (not in an effect state) so it survives refreshes without extra
+ * navigation.
+ */
+function useGithubCallbackCode(): string | null {
+  return useSyncExternalStore(
+    subscribeToNothing,
+    () => new URLSearchParams(window.location.search).get(GITHUB_REDIRECT_PARAM),
+    () => null,
+  );
+}
+
 export function LoginForm({ onSubmit }: LoginFormProps) {
   const [values, setValues] = useState<LoginFormValues>({ email: "", password: "" });
   const [errors, setErrors] = useState<Partial<Record<"email" | "password", string | null>>>({});
@@ -35,6 +52,10 @@ export function LoginForm({ onSubmit }: LoginFormProps) {
   const startSession = useStartSession();
   const router = useRouter();
   const { visible, toggle } = usePasswordVisibility();
+
+  // A redirected callback failure replaces (not stacks with) a submit alert.
+  const githubKind = githubCallbackAlert(useGithubCallbackCode());
+  const banner = githubKind ? AUTH_ALERTS[githubKind] : alert;
 
   function handleChange(field: "email" | "password") {
     return (event: ChangeEvent<HTMLInputElement>) => {
@@ -83,13 +104,13 @@ export function LoginForm({ onSubmit }: LoginFormProps) {
 
   return (
     <div>
-      {alert ? (
+      {banner ? (
         <AlertBanner
-          tone={alert.tone}
-          icon={<MaterialIcon name={alert.icon} className="shrink-0 text-[18px]" />}
+          tone={banner.tone}
+          icon={<MaterialIcon name={banner.icon} className="shrink-0 text-[18px]" />}
           className="mb-5"
         >
-          {alert.message}
+          {banner.message}
         </AlertBanner>
       ) : null}
       <form className="space-y-5" onSubmit={handleSubmit} noValidate>
@@ -103,7 +124,7 @@ export function LoginForm({ onSubmit }: LoginFormProps) {
           value={values.email}
           onChange={handleChange("email")}
           disabled={pending}
-          invalid={alert?.id === INVALID_LOGIN.id}
+          invalid={banner?.id === INVALID_LOGIN.id}
           error={errors.email ?? null}
           icon={<MaterialIcon name="mail" className="shrink-0 text-[20px] text-teal" />}
         />
@@ -117,7 +138,7 @@ export function LoginForm({ onSubmit }: LoginFormProps) {
           value={values.password}
           onChange={handleChange("password")}
           disabled={pending}
-          invalid={alert?.id === INVALID_LOGIN.id}
+          invalid={banner?.id === INVALID_LOGIN.id}
           error={errors.password ?? null}
           icon={<MaterialIcon name="lock" className="shrink-0 text-[20px] text-teal" />}
           trailing={

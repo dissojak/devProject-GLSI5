@@ -16,6 +16,52 @@ export function loginAlertKind(code: string): LoginAlertKind {
   return LOGIN_ALERTS_BY_CODE[code] ?? "unexpected";
 }
 
+const GITHUB_CALLBACK_ALERTS_BY_CODE: Record<string, LoginAlertKind> = {
+  FORBIDDEN: "pending-approval",
+  ACCOUNT_DISABLED: "account-deactivated",
+  CONFLICT: "github-conflict",
+};
+
+export function githubCallbackAlert(code: string | null): LoginAlertKind | null {
+  if (code === null) return null;
+  return GITHUB_CALLBACK_ALERTS_BY_CODE[code] ?? "unexpected";
+}
+
+const GITHUB_HANDOFF_PARAMS = [
+  "access_token",
+  "user_id",
+  "user_name",
+  "user_email",
+  "user_role",
+] as const;
+
+/**
+ * Parses the URL fragment the backend OAuth callback redirects through
+ * (`/session#access_token=...&user_id=...`). Returns null when the fragment
+ * is absent or incomplete — the session page then shows its not-signed-in
+ * state.
+ */
+export function parseGithubHandoff(
+  rawFragment: string,
+): { user: AuthAccount; accessToken: string } | null {
+  const fragment = rawFragment.replace(/^#/, "");
+  if (!fragment) return null;
+  const params = new URLSearchParams(fragment);
+  const fields = GITHUB_HANDOFF_PARAMS.map((name) => params.get(name));
+  if (fields.some((field) => !field)) return null;
+  const { user, accessToken } = parseAuthSuccess({
+    data: {
+      id: fields[1],
+      name: fields[2],
+      email: fields[3],
+      role: fields[4],
+    },
+    accessToken: fields[0],
+  });
+  if (!user || !accessToken) return null;
+  return { user, accessToken };
+}
+
 export function parseApiError(payload: unknown): ApiErrorBody | null {
   if (typeof payload !== "object" || payload === null) return null;
   const envelope = payload as { error?: unknown };
