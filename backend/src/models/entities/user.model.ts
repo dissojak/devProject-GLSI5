@@ -48,7 +48,8 @@ export interface UserMethods extends SoftDeletableMethods {
   setPassword(plain: string): Promise<UserDocument>;
   verifyPassword(plain: string): Promise<boolean>;
   recordLogin(): Promise<UserDocument>;
-  updateProfile(patch: { name?: string; avatarUrl?: string | null }): Promise<UserDocument>;  changeRole(newRole: UserRole): Promise<UserDocument>;
+  updateProfile(patch: { name?: string; avatarUrl?: string | null }): Promise<UserDocument>;
+  changeRole(newRole: UserRole): Promise<UserDocument>;
   deactivate(): Promise<UserDocument>;
   reactivate(): Promise<UserDocument>;
   isAdmin(): boolean;
@@ -192,7 +193,7 @@ userSchema.methods.updateProfile = async function updateProfile(
   if (patch.name !== undefined) {
     this.set('name', patch.name.trim());
   }
-   if (patch.avatarUrl !== undefined) {
+  if (patch.avatarUrl !== undefined) {
     this.set('avatarUrl', patch.avatarUrl);
   }
   return this.save() as unknown as Promise<UserDocument>;

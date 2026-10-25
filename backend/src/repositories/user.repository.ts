@@ -71,4 +71,23 @@ async findByStatus(
   return this.find({ status });
 }
 
+/**
+ * Loads a user by id WITH its password hash (the field is `select: false`)
+ * for sensitive checks: password change, credential verification.
+ */
+async findByIdWithPassword(
+  id: string,
+  options: RepositoryOptions = {},
+): Promise<UserDocument | null> {
+  const query = this.model
+    .findById(id)
+    .session(options.session ?? null)
+    .select('+passwordHash');
+  if (options.withDeleted) {
+    query.setOptions({ withDeleted: true });
+  }
+
+  return (await query.exec()) as UserDocument | null;
+}
+
 }

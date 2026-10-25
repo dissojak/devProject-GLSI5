@@ -4,7 +4,6 @@ import {
 } from '../../domain/errors/index.js';
 
 import { UserRepository } from '../../repositories/user.repository.js';
-import { UserCredentialsRepository } from '../../repositories/user-credentials.repository.js';
 
 import type { UserDocument } from '../../models/entities/index.js';
 
@@ -43,7 +42,6 @@ function requireActive(user: UserDocument | null): UserDocument {
 
 export function createProfileService(
   users: UserRepository = new UserRepository(),
-  credentialUsers: UserCredentialsRepository = new UserCredentialsRepository(),
 ) {
   async function findActiveUser(id: string) {
     return requireActive(await users.findById(id, { withDeleted: true }));
@@ -69,7 +67,7 @@ export function createProfileService(
     input: ChangePasswordInput,
   ) {
     const user = requireActive(
-      await credentialUsers.findByIdWithPassword(userId),
+      await users.findByIdWithPassword(userId, { withDeleted: true }),
     );
 
     if (!user.hasLocalPassword()) {

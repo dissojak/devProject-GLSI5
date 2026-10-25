@@ -16,7 +16,6 @@ import { createRequireAuth } from '../middleware/require-auth.js';
 import { UserRepository } from '../repositories/user.repository.js';
 import { AuthIdentityRepository } from '../repositories/auth-identity.repository.js';
 import { ProjectRepository } from '../repositories/project.repository.js';
-import { UserCredentialsRepository } from '../repositories/user-credentials.repository.js';
 
 // Functional service factories
 import { createAuthService } from '../services/auth/auth.service.js';
@@ -46,7 +45,6 @@ export function createApiRouter(): Router {
   const users = new UserRepository();
   const identities = new AuthIdentityRepository();
   const projects = new ProjectRepository();
-  const credentialUsers = new UserCredentialsRepository();
 
   // Shared services
   const sessions = createSessionTokenService(env.sessionSecret);
@@ -54,7 +52,7 @@ export function createApiRouter(): Router {
   const userService = createUserService(users);
   const approvalService = createUserApprovalService(users);
   const projectService = createProjectService(projects);
-  const profileService = createProfileService(users, credentialUsers);
+  const profileService = createProfileService(users);
   const githubOAuthService = createGithubOAuthService(
     env.githubClientId,
     env.githubClientSecret,
@@ -109,7 +107,9 @@ export function createApiRouter(): Router {
 
   // User project management
   router.use('/projects', createProjectRouter(projectService, requireAuth));
-  // User profile management
-  router.use(createProfileRouter(profileService, requireAuth));  
+
+  // Self-scoped profile (self-vs-admin read: mounted at /profile)
+  router.use('/profile', createProfileRouter(profileService, requireAuth));
+
   return router;
 }
