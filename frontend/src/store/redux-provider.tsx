@@ -11,6 +11,7 @@ export const AUTH_SESSION_STORAGE_KEY = STORAGE_KEY;
 
 export function ReduxProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
+    if (appStore.getState().authSession.token) return;
     appStore.dispatch(sessionRestored(parseStoredSession(window.localStorage.getItem(STORAGE_KEY))));
   }, []);
 

@@ -38,8 +38,7 @@ const GITHUB_HANDOFF_PARAMS = [
 /**
  * Parses the URL fragment the backend OAuth callback redirects through
  * (`/session#access_token=...&user_id=...`). Returns null when the fragment
- * is absent or incomplete — the session page then shows its not-signed-in
- * state.
+ * is absent or incomplete — the session page then routes back to login.
  */
 export function parseGithubHandoff(
   rawFragment: string,

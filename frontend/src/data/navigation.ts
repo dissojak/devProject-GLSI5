@@ -6,12 +6,6 @@ export const HOME_ROUTE: NavLink = {
   href: "/",
 };
 
-export const SESSION_ROUTE: NavLink = {
-  id: "session",
-  label: "Session",
-  href: "/session",
-};
-
 export const AUTH_LOGIN_ROUTE: NavLink = {
   id: "auth-login",
   label: "Log in",

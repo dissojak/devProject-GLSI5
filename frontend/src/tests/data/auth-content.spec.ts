@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AUTH_ALERTS } from "@/data/auth-alerts";
 import { GITHUB_BUTTON, GITHUB_REDIRECT_PARAM } from "@/data/auth-github";
-import { SESSION_SUMMARY, SESSION_SUMMARY_FIELDS, SESSION_BACK_LINK } from "@/data/session";
 import {
   SIGNUP_CONFIRMATION,
   SIGNUP_CONFIRMATION_CTA,
@@ -77,19 +76,5 @@ describe("signup confirmation copy", () => {
     expect(SIGNUP_CONFIRMATION.badge).toBe("Pending approval");
     expect(SIGNUP_CONFIRMATION_CTA.label).toBe("Back to login");
     expect(SIGNUP_CONFIRMATION_CTA.href).toBe("/login");
-  });
-});
-
-describe("session summary copy", () => {
-  it("declares the account fields and back link", () => {
-    expect(SESSION_SUMMARY_FIELDS).toEqual([
-      { id: "name", label: "Name" },
-      { id: "email", label: "Email" },
-      { id: "role", label: "Role" },
-    ]);
-    expect(SESSION_SUMMARY.heading).toBe("You are signed in");
-    expect(SESSION_SUMMARY.tokenLabel).toBe("Access token");
-    expect(SESSION_BACK_LINK.label).toBe("Back to login");
-    expect(SESSION_BACK_LINK.href).toBe("/login");
   });
 });
