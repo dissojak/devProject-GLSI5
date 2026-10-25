@@ -20,7 +20,7 @@ export const SESSION_SUMMARY = {
 export const SESSION_BACK_LINK: NavLink = {
   id: "session-back-link",
   label: "Back to login",
-  href: "/",
+  href: "/login",
 };
 
 export const SESSION_LOGOUT_CTA = {

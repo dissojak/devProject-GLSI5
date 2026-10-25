@@ -23,5 +23,5 @@ export const SIGNUP_CONFIRMATION = {
 export const SIGNUP_CONFIRMATION_CTA: NavLink = {
   id: "signup-confirmation-cta",
   label: "Back to login",
-  href: "/",
+  href: "/login",
 };

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { BRAND } from "@/data/brand";
-import { NAV_LINKS } from "@/data/navigation";
+import { HOME_ROUTE } from "@/data/navigation";
 import { buttonClass } from "@/shared/button";
 import { MaterialIcon } from "@/shared/material-icon";
 
@@ -12,23 +12,18 @@ interface SiteHeaderProps {
 
 export function SiteHeader({ prompt, ctaLabel, ctaHref }: SiteHeaderProps) {
   return (
-    <header className="relative z-20 flex h-[72px] w-full shrink-0 items-center justify-between border-b border-ice/15 px-6 sm:px-12">
-      <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-ice shadow-md shadow-ice/20">
-          <MaterialIcon name="rocket_launch" fill className="text-[20px] text-navy" />
+    <header className="sticky top-0 z-50 flex h-[72px] w-full items-center justify-between border-b border-ice/15 bg-navy/80 px-6 backdrop-blur-md sm:px-12 lg:px-20">
+      <Link href={HOME_ROUTE.href} className="group flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-ice text-navy shadow-md transition-transform group-hover:scale-105">
+          <MaterialIcon name="rocket_launch" className="text-[24px]" />
         </div>
-        <span className="text-lg font-bold tracking-tight text-foam">{BRAND.name}</span>
-      </div>
-      <nav className="hidden items-center space-x-8 text-sm font-medium md:flex">
-        {NAV_LINKS.map((link) => (
-          <a key={link.id} className="text-mist transition-colors hover:text-foam" href={link.href}>
-            {link.label}
-          </a>
-        ))}
-      </nav>
-      <div className="flex items-center space-x-3">
-        <span className="text-sm text-mist">{prompt}</span>
-        <Link className={buttonClass("champagne", "px-4 py-2 text-sm")} href={ctaHref}>
+        <span className="font-display text-headline-sm tracking-tight text-foam">
+          {BRAND.wordmarkMain} <span className="text-ice">{BRAND.wordmarkAccent}</span>
+        </span>
+      </Link>
+      <div className="flex items-center gap-6">
+        <span className="font-body-md text-mist">{prompt}</span>
+        <Link href={ctaHref} className={buttonClass("champagne", "px-5 py-2 tracking-wide")}>
           {ctaLabel}
         </Link>
       </div>

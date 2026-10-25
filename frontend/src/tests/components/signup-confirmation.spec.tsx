@@ -31,7 +31,7 @@ describe("SignupConfirmation", () => {
     expect(screen.getByText("Email")).toBeDefined();
     expect(screen.getByText("ada@example.com")).toBeDefined();
     expect(screen.getByText("Pending approval")).toBeDefined();
-    expect(screen.getByText("Back to login").getAttribute("href")).toBe("/");
+    expect(screen.getByText("Back to login").getAttribute("href")).toBe("/login");
     expect(screen.getByText("Need help? Contact your administrator.")).toBeDefined();
   });
 });

@@ -48,7 +48,7 @@ describe("SessionSummary", () => {
     renderSummary();
 
     expect(screen.getByText("You are not signed in.")).toBeDefined();
-    expect(screen.getByText("Back to login").getAttribute("href")).toBe("/");
+    expect(screen.getByText("Back to login").getAttribute("href")).toBe("/login");
   });
 
   it("lists the signed-in account and its token", () => {
@@ -111,7 +111,7 @@ describe("SessionSummary logout", () => {
       expect(appStore.getState().authSession.token).toBeNull();
     });
     expect(appStore.getState().authSession.user).toBeNull();
-    expect(mockRouter.replace).toHaveBeenCalledWith("/");
+    expect(mockRouter.replace).toHaveBeenCalledWith("/login");
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:4000/api/v1/auth/logout",
       {
@@ -138,7 +138,7 @@ describe("SessionSummary logout", () => {
     await waitFor(() => {
       expect(appStore.getState().authSession.token).toBeNull();
     });
-    expect(mockRouter.replace).not.toHaveBeenCalledWith("/");
+    expect(mockRouter.replace).not.toHaveBeenCalledWith("/login");
     expect(
       await screen.findByText("Something went wrong. Please try again."),
     ).toBeDefined();

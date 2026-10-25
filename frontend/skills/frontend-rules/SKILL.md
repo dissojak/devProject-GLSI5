@@ -101,8 +101,16 @@ tests/        → mirrors src/ 1:1 (src/tests/utils ↔ src/utils, …)
 - **Server-first.** Default to Server Components; add `"use client"` ONLY
   to the smallest leaf needing state/effects/handlers (currently:
   `login-form.tsx`, `signup-form.tsx`, `signup-card.tsx`,
-  `session-summary.tsx`, `store/redux-provider.tsx`). Never mark a folder
+  `session-summary.tsx`, `store/redux-provider.tsx`, and the landing
+  motion leaves `hero-section.tsx`, `features-grid.tsx`,
+  `workflow-section.tsx`, `ai-plan-section.tsx`). Never mark a folder
   client — mark the file.
+- **Motion (`motion/react`).** Landing animation must import only from
+  `motion/react`; every animated client leaf wraps its JSX in
+  `<MotionConfig reducedMotion="user">` so OS reduced-motion wins;
+  animate GPU-friendly properties only (`transform`, `opacity`);
+  repeated entrance patterns use shared `Variants` consts, and tone/icon
+  variants are data rows extended by table entries, never new branches.
 - **One primary React component per file**; local sub-JSX is acceptable
   when it repeats ≥ 2 times INSIDE that file and nowhere else.
 - Files `kebab-case.tsx`; components/functions exported as named exports,
@@ -125,9 +133,10 @@ tests/        → mirrors src/ 1:1 (src/tests/utils ↔ src/utils, …)
 
 New npm dependencies require the user/team's explicit approval in the request.
 The current approved stack: `next, react, react-dom, clsx,
-tailwind-merge, @reduxjs/toolkit, react-redux` (runtime) and `vitest,
-@vitejs/plugin-react, jsdom, @testing-library/react, @testing-library/dom,
-vite-tsconfig-paths` (dev). Anything else: propose it first with (1) problem,
+tailwind-merge, motion, @reduxjs/toolkit, react-redux` (runtime) and
+`vitest, @vitejs/plugin-react, jsdom, @testing-library/react,
+@testing-library/dom, vite-tsconfig-paths` (dev). Test specs touching
+`motion/react` stub the browser env first via `src/tests/motion-stubs.ts`. Anything else: propose it first with (1) problem,
 (2) why no existing dep solves it, (3) closure impact on this skill.
 
 ## Step 5 — Verify before you say "done"
@@ -160,6 +169,8 @@ you, silently.
   `src/data/navigation.ts`
 - Client-leaf style to copy: `src/components/auth/login-form.tsx`,
   `src/components/auth/signup-form.tsx`
+- Motion style to copy: `src/components/landing/hero-section.tsx`,
+  `src/components/landing/workflow-section.tsx`
 - Slot-shell style to copy: `src/components/auth/auth-card.tsx`,
   `src/components/auth/brand-panel.tsx`
 - Spec style to copy: `src/tests/components/login-form.spec.tsx`

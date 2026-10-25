@@ -70,6 +70,6 @@ describe("SignupCard swap", () => {
     expect(screen.getByText("Your account is awaiting administrator approval.")).toBeDefined();
     expect(screen.getByText("You will be able to log in once an administrator approves your account.")).toBeDefined();
     expect(screen.getByText("Need help? Contact your administrator.")).toBeDefined();
-    expect(screen.getByText("Back to login").getAttribute("href")).toBe("/");
+    expect(screen.getByText("Back to login").getAttribute("href")).toBe("/login");
   });
 });

@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { LoginPage } from "@/components/auth/login-page";
+import { LandingPage } from "@/components/landing/landing-page";
 
 export const metadata: Metadata = {
-  title: "Log in",
+  title: "Terminal Access",
 };
 
 export default function Home() {
-  return <LoginPage />;
+  return <LandingPage />;
 }

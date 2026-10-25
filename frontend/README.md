@@ -24,8 +24,12 @@ Dependency direction: `app → components → shared`; every layer may use
 design tokens in `src/app/globals.css` (`@theme`).
 
 Key seams:
-- Routes: `/` renders the login page, `/signup` the signup page. Both
-  cross-link through the `AUTH_PAGE_PROMPTS` data table.
+- Routes: `/` renders the landing page, `/login` and `/signup` the auth
+  pages. All cross-link through `AUTH_PAGE_PROMPTS`, `LANDING_HEADER_CTAS`,
+  and other `data/` route rows.
+- `data/landing*`, `data/hero.ts`, `data/features.ts`, `data/workflow.ts`,
+  `data/ai-plan.ts`, `data/tech-strip.ts`, `data/cta-banner.ts` feed the
+  landing page; animation leaves import only `motion/react`.
 - `LoginForm` / `SignupForm` take an optional `onSubmit(values)` prop —
   wire the backend auth calls there without touching form internals.
 - Content rows (nav links, pipeline steps, signup steps, pills) live in

@@ -76,7 +76,7 @@ describe("signup confirmation copy", () => {
     );
     expect(SIGNUP_CONFIRMATION.badge).toBe("Pending approval");
     expect(SIGNUP_CONFIRMATION_CTA.label).toBe("Back to login");
-    expect(SIGNUP_CONFIRMATION_CTA.href).toBe("/");
+    expect(SIGNUP_CONFIRMATION_CTA.href).toBe("/login");
   });
 });
 
@@ -90,6 +90,6 @@ describe("session summary copy", () => {
     expect(SESSION_SUMMARY.heading).toBe("You are signed in");
     expect(SESSION_SUMMARY.tokenLabel).toBe("Access token");
     expect(SESSION_BACK_LINK.label).toBe("Back to login");
-    expect(SESSION_BACK_LINK.href).toBe("/");
+    expect(SESSION_BACK_LINK.href).toBe("/login");
   });
 });

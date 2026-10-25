@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AI_BADGE_PILL, CAPABILITY_PILLS, REQUEST_ACCESS_PILL } from "@/data/capabilities";
 import { FOOTER_COPYRIGHT, FOOTER_LINKS } from "@/data/footer";
-import { NAV_LINKS } from "@/data/navigation";
+import { HOME_ROUTE } from "@/data/navigation";
 import { HIGHLIGHTED_STEP_IDS, PIPELINE_NODE_ICONS, PIPELINE_STEPS } from "@/data/pipeline";
 import { SIGNUP_STEPS } from "@/data/signup-steps";
 import { AUTH_PAGE_PROMPTS } from "@/data/navigation";
@@ -12,18 +12,21 @@ function assertUniqueIds(rows: readonly { id: string }[]): void {
 }
 
 describe("navigation data", () => {
-  it("declares unique ids with labels and hrefs", () => {
-    for (const links of [NAV_LINKS, FOOTER_LINKS]) {
-      assertUniqueIds(links);
-      for (const link of links) {
-        expect(link.label.length).toBeGreaterThan(0);
-        expect(link.href.length).toBeGreaterThan(0);
-      }
-    }
+  it("declares a home route so brand marks lead back to the landing", () => {
+    expect(HOME_ROUTE.href).toBe("/");
+    expect(HOME_ROUTE.label.length).toBeGreaterThan(0);
   });
 });
 
 describe("footer data", () => {
+  it("declares unique link ids with labels and hrefs", () => {
+    assertUniqueIds(FOOTER_LINKS);
+    for (const link of FOOTER_LINKS) {
+      expect(link.label.length).toBeGreaterThan(0);
+      expect(link.href.length).toBeGreaterThan(0);
+    }
+  });
+
   it("states a copyright line", () => {
     expect(FOOTER_COPYRIGHT).toMatch(/^© 2\d{3}/);
   });
@@ -109,9 +112,9 @@ describe("auth page prompts", () => {
 
     expect(signup.headerPrompt).toBe("Already have an account?");
     expect(signup.headerCta.label).toBe("Log in");
-    expect(signup.headerCta.href).toBe("/");
+    expect(signup.headerCta.href).toBe("/login");
     expect(signup.cardCta.label).toBe("Log in");
-    expect(signup.cardCta.href).toBe("/");
+    expect(signup.cardCta.href).toBe("/login");
   });
 });
 
