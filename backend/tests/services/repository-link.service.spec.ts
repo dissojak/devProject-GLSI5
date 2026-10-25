@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { InvariantViolationError, NotFoundError } from '../../src/domain/errors/index.js';
-import type { ProjectDocument, RepositoryRefFields } from '../../src/models/entities/index.js';
+import type { RepositoryRefFields } from '../../src/models/value-objects/repository-ref.schema.js';
 import type { ProjectRepository } from '../../src/repositories/project.repository.js';
 import type { GithubRepositoryService } from '../../src/services/repository-link/github-repository.service.js';
 import { createRepositoryLinkService } from '../../src/services/repository-link/repository-link.service.js';

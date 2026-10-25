@@ -38,10 +38,24 @@ describe('connectRepositorySchema', () => {
     expect(result.success && result.data.branch).toBe('main');
   });
 
-  it('rejects an invalid url', () => {
-    const result = connectRepositorySchema.safeParse({ url: 'not-a-url', branch: 'main' });
+  it.each([
+    'https://github.com/octocat/Hello-World',
+    'https://www.github.com/octocat/Hello-World',
+    'https://github.com/octocat/hello.world.git',
+    'https://github.com/octocat/Hello-World/',
+  ])('accepts the GitHub repository URL "%s"', (url) => {
+    expect(connectRepositorySchema.safeParse({ url, branch: 'main' }).success).toBe(true);
+  });
 
-    expect(result.success).toBe(false);
+  it.each([
+    'not-a-url',
+    'http://github.com/octocat/Hello-World',
+    'ssh://git@github.com/octocat/Hello-World.git',
+    'https://gitlab.com/octocat/Hello-World',
+    'https://github.com/octocat',
+    'https://github.com/octocat/Hello-World/extra/path',
+  ])('rejects the non-GitHub-https URL "%s"', (url) => {
+    expect(connectRepositorySchema.safeParse({ url, branch: 'main' }).success).toBe(false);
   });
 
   it('rejects unknown keys', () => {
