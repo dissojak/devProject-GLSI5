@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+@theme {
+  --color-navy: #011c40;
+  --color-basin: #01142e;
+  --color-panel: #023859;
+  --color-steel: #26658c;
+  --color-ice: #a7ebf2;
+  --color-ice-bright: #c2f3f8;
+  --color-teal: #54acbf;
+  --color-lavender: #a78bfa;
+  --color-champagne: #e8d5a3;
+  --color-mint: #4ade9a;
+  --color-orange: #ff9f43;
+  --color-crimson: #f2465e;
+  --color-foam: #eaf9fb;
+  --color-mist: #8db8c8;
+}
+
+@theme inline {
+  --font-sans: var(--font-jakarta);
+  --font-mono: var(--font-jetbrains);
+}
+
+@layer base {
+  body {
+    overscroll-behavior: none;
+  }
+
+  ::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility dotted-grid {
+  background-image: radial-gradient(var(--color-mist) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+@utility shadow-ai-glow {
+  box-shadow: 0 0 15px
+    color-mix(in oklab, var(--color-lavender) 25%, transparent);
+}
+
+@utility shadow-gold-glow {
+  box-shadow: 0 0 40px
+    color-mix(in oklab, var(--color-champagne) 40%, transparent);
+}
