@@ -6,6 +6,7 @@ import { getEnv } from '../config/env.js';
 import { createAuthRouter } from './auth.routes.js';
 import { createGithubAuthRouter } from './github-auth.routes.js';
 import { createProjectRouter } from './project.routes.js';
+import { createRepositoryLinkRouter } from './repository-link.routes.js';
 import { createUsersRouter } from './users.routes.js';
 import { createUserApprovalRouter } from './user-approval.routes.js';
 // Middleware factories
@@ -22,6 +23,7 @@ import { createGithubAuthService } from '../services/auth/github-auth.service.js
 import { createGithubOAuthService } from '../services/auth/github-oauth.service.js';
 import { createSessionTokenService } from '../services/auth/session-token.service.js';
 import { createProjectService } from '../services/project/project.service.js';
+import { createRepositoryLinkService } from '../services/repository-link/repository-link.service.js';
 import { createUserService } from '../services/users/user.service.js';
 import { createUserApprovalService } from '../services/users/user-approval.service.js';
 
@@ -50,6 +52,7 @@ export function createApiRouter(): Router {
   const userService = createUserService(users);
   const approvalService = createUserApprovalService(users);
   const projectService = createProjectService(projects);
+  const repositoryLink = createRepositoryLinkService(projects);
 
   const githubOAuthService = createGithubOAuthService(
     env.githubClientId,
@@ -104,6 +107,7 @@ export function createApiRouter(): Router {
 
   // User project management
   router.use('/projects', createProjectRouter(projectService, requireAuth));
+  router.use('/projects', createRepositoryLinkRouter(repositoryLink, requireAuth));
 
   return router;
 }
