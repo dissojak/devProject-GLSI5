@@ -79,8 +79,9 @@ describe("SessionSummary finishing a GitHub handoff", () => {
     expect(appStore.getState().authSession).toEqual({
       token: "token-gh",
       user: ADA,
+      hydrated: false,
     });
-    expect(mockRouter.replace).toHaveBeenCalledWith("/session");
+    expect(mockRouter.replace).toHaveBeenCalledWith("/projects");
   });
 
   it("stays signed-in-free and flags a corrupted handoff fragment", () => {

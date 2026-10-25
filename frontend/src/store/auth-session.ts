@@ -5,9 +5,12 @@ import type { AuthAccount } from "@/types/auth";
 export interface AuthSessionState {
   token: string | null;
   user: AuthAccount | null;
+  hydrated: boolean;
 }
 
-const initialState: AuthSessionState = { token: null, user: null };
+export type StoredSession = Pick<AuthSessionState, "token" | "user">;
+
+const initialState: AuthSessionState = { token: null, user: null, hydrated: false };
 
 function isAuthAccount(value: unknown): value is AuthAccount {
   if (typeof value !== "object" || value === null) return false;
@@ -32,9 +35,13 @@ export const authSessionSlice = createSlice({
       state.user = action.payload.user;
     },
     sessionCleared: () => initialState,
-    sessionRestored: (state, action: PayloadAction<AuthSessionState>) => {
+    sessionRestored: (
+      state,
+      action: PayloadAction<StoredSession>,
+    ) => {
       state.token = action.payload.token;
       state.user = action.payload.user;
+      state.hydrated = true;
     },
   },
 });
@@ -42,12 +49,12 @@ export const authSessionSlice = createSlice({
 export const { sessionStarted, sessionCleared, sessionRestored } =
   authSessionSlice.actions;
 
-export function parseStoredSession(raw: string | null): AuthSessionState {
+export function parseStoredSession(raw: string | null): StoredSession {
   if (!raw) return initialState;
   try {
     const parsed: unknown = JSON.parse(raw);
     if (typeof parsed !== "object" || parsed === null) return initialState;
-    const session = parsed as Partial<AuthSessionState>;
+    const session = parsed as StoredSession;
     if (session.token !== null && typeof session.token !== "string") return initialState;
     if (session.user !== null && !isAuthAccount(session.user)) return initialState;
     return { token: session.token ?? null, user: session.user ?? null };

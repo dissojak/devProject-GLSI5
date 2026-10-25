@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { SESSION_ROUTE } from "@/data/navigation";
+import { PROJECTS_ROUTE } from "@/data/dashboard";
 import { SESSION_SUMMARY, SESSION_SUMMARY_FIELDS, SESSION_BACK_LINK, SESSION_LOGOUT_CTA } from "@/data/session";
 import { useAuthSession, useStartSession, useSessionClear } from "@/hooks/use-auth-session";
 import { useAccountLogout } from "@/hooks/use-auth-request";
@@ -46,7 +46,7 @@ export function SessionSummary() {
     if (!callbackHandoff) return;
 
     startSession(callbackHandoff);
-    router.replace(SESSION_ROUTE.href);
+    router.replace(PROJECTS_ROUTE.href);
   }, [startSession, router]);
 
   async function handleLogout() {

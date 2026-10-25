@@ -7,6 +7,8 @@ import { parseStoredSession, sessionRestored } from "@/store/auth-session";
 
 const STORAGE_KEY = "deployment-planner-ai.auth-session";
 
+export const AUTH_SESSION_STORAGE_KEY = STORAGE_KEY;
+
 export function ReduxProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     appStore.dispatch(sessionRestored(parseStoredSession(window.localStorage.getItem(STORAGE_KEY))));
@@ -14,8 +16,8 @@ export function ReduxProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const persist = () => {
-      const session = appStore.getState().authSession;
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+      const { token, user } = appStore.getState().authSession;
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ token, user }));
     };
     persist();
     return appStore.subscribe(persist);

@@ -7,6 +7,8 @@ export interface AuthAccount {
   role: string;
 }
 
+export type AuthGateStatus = "pending" | "granted" | "denied";
+
 export interface AuthTokens {
   accessToken: string;
   tokenType: string;

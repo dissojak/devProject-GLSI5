@@ -12,6 +12,12 @@ export const SESSION_ROUTE: NavLink = {
   href: "/session",
 };
 
+export const AUTH_LOGIN_ROUTE: NavLink = {
+  id: "auth-login",
+  label: "Log in",
+  href: "/login",
+};
+
 export const AUTH_PAGE_PROMPTS: Record<AuthPageId, AuthPagePromptSet> = {
   login: {
     id: "login",

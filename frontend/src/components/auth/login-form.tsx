@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import type { AuthAlertBanner, LoginFormValues } from "@/types/auth";
 import { AUTH_ALERTS } from "@/data/auth-alerts";
 import { GITHUB_REDIRECT_PARAM } from "@/data/auth-github";
-import { SESSION_ROUTE } from "@/data/navigation";
+import { PROJECTS_ROUTE } from "@/data/dashboard";
 import { useAccountLogin } from "@/hooks/use-auth-request";
 import { useStartSession } from "@/hooks/use-auth-session";
 import { usePasswordVisibility } from "@/hooks/use-password-visibility";
@@ -83,7 +83,7 @@ export function LoginForm({ onSubmit }: LoginFormProps) {
     }
     setAlert(null);
     startSession({ accessToken: success.accessToken, user: success.user });
-    router.replace(SESSION_ROUTE.href);
+    router.replace(PROJECTS_ROUTE.href);
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
