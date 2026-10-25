@@ -665,65 +665,6 @@ export const swaggerDocument = {
                 },
             },
         },
-        '/api/v1/projects/{id}/repository': {
-            put: {
-                tags: ['Projects'],
-                summary: 'Lier un dépôt GitHub au projet',
-                description: 'Enregistre le dépôt (URL + branche), puis le vérifie auprès de GitHub : ' +
-                    'le dépôt doit être public et la branche doit exister. ' +
-                    'Le résultat est stocké dans repository.isValid. ' +
-                    'Appeler à nouveau pour remplacer le dépôt ou changer de branche.',
-                security: [{ bearerAuth: [] }],
-                parameters: [{ $ref: '#/components/parameters/ProjectId' }],
-                requestBody: {
-                    required: true,
-                    content: {
-                        'application/json': {
-                            schema: { $ref: '#/components/schemas/ConnectRepositoryInput' },
-                        },
-                    },
-                },
-                responses: {
-                    '200': {
-                        description: 'Dépôt enregistré. data.repository.isValid à false signifie dépôt ou ' +
-                            'branche introuvable (voir lastVerificationError).',
-                        content: {
-                            'application/json': {
-                                schema: { $ref: '#/components/schemas/ProjectResponse' },
-                            },
-                        },
-                    },
-                    '400': { $ref: '#/components/responses/ValidationError' },
-                    '401': { $ref: '#/components/responses/Unauthorized' },
-                    '404': { $ref: '#/components/responses/NotFound' },
-                    '500': { $ref: '#/components/responses/GithubUnavailable' },
-                },
-            },
-        },
-        '/api/v1/projects/{id}/repository/verify': {
-            post: {
-                tags: ['Projects'],
-                summary: 'Revérifier le dépôt GitHub du projet',
-                description: 'Interroge de nouveau GitHub (dépôt public, branche existante) et met à jour ' +
-                    'repository.isValid. Sans dépôt lié, répond 404.',
-                security: [{ bearerAuth: [] }],
-                parameters: [{ $ref: '#/components/parameters/ProjectId' }],
-                responses: {
-                    '200': {
-                        description: 'Vérification terminée',
-                        content: {
-                            'application/json': {
-                                schema: { $ref: '#/components/schemas/ProjectResponse' },
-                            },
-                        },
-                    },
-                    '400': { $ref: '#/components/responses/ValidationError' },
-                    '401': { $ref: '#/components/responses/Unauthorized' },
-                    '404': { $ref: '#/components/responses/NotFound' },
-                    '500': { $ref: '#/components/responses/GithubUnavailable' },
-                },
-            },
-        },
     },
     components: {
         parameters: {
@@ -766,21 +707,6 @@ export const swaggerDocument = {
                 content: {
                     'application/json': {
                         schema: { $ref: '#/components/schemas/ErrorResponse' },
-                    },
-                },
-            },
-            GithubUnavailable: {
-                description: 'Erreur technique côté GitHub (injoignable, quota atteint). ' +
-                    'Le dépôt n’est pas modifié, réessayer plus tard.',
-                content: {
-                    'application/json': {
-                        schema: { $ref: '#/components/schemas/ErrorResponse' },
-                        example: {
-                            error: {
-                                code: 'INVARIANT_VIOLATION',
-                                message: 'GitHub rate limit reached, try again later',
-                            },
-                        },
                     },
                 },
             },
@@ -889,49 +815,6 @@ export const swaggerDocument = {
                     description: { type: 'string', maxLength: 1000, example: 'Nouvelle description' },
                 },
             },
-            ConnectRepositoryInput: {
-                type: 'object',
-                additionalProperties: false,
-                required: ['url', 'branch'],
-                properties: {
-                    url: {
-                        type: 'string',
-                        format: 'uri',
-                        maxLength: 200,
-                        example: 'https://github.com/octocat/Hello-World',
-                    },
-                    branch: {
-                        type: 'string',
-                        minLength: 1,
-                        maxLength: 255,
-                        pattern: '^[A-Za-z0-9._/-]+$',
-                        example: 'master',
-                    },
-                },
-            },
-            RepositoryRef: {
-                type: 'object',
-                properties: {
-                    provider: { type: 'string', example: 'github' },
-                    owner: { type: 'string', example: 'octocat' },
-                    name: { type: 'string', example: 'Hello-World' },
-                    branch: { type: 'string', example: 'master' },
-                    url: {
-                        type: 'string',
-                        format: 'uri',
-                        description: 'Champ calculé par le modèle (virtual), jamais stocké',
-                        example: 'https://github.com/octocat/Hello-World',
-                    },
-                    isValid: {
-                        type: 'boolean',
-                        description: 'true seulement si GitHub confirme le dépôt public et la branche',
-                        example: true,
-                    },
-                    defaultBranch: { type: 'string', example: 'master' },
-                    lastVerifiedAt: { type: 'string', format: 'date-time' },
-                    lastVerificationError: { type: 'string', example: 'Branch "dev" not found' },
-                },
-            },
             Project: {
                 type: 'object',
                 properties: {
@@ -942,7 +825,6 @@ export const swaggerDocument = {
                     environment: { type: 'string', example: 'DEVELOPMENT' },
                     createdAt: { type: 'string', format: 'date-time' },
                     updatedAt: { type: 'string', format: 'date-time' },
-                    repository: { $ref: '#/components/schemas/RepositoryRef' },
                 },
             },
             ProjectResponse: {
