@@ -7,16 +7,20 @@ import { createAuthRouter } from './auth.routes.js';
 import { createGithubAuthRouter } from './github-auth.routes.js';
 import { createProjectRouter } from './project.routes.js';
 import { createRepositoryLinkRouter } from './repository-link.routes.js';
+import { createAnalysisRouter } from './analysis.routes.js';
+import { createAnalysisInternalRouter } from './analysis-internal.routes.js';
 import { createUsersRouter } from './users.routes.js';
 import { createUserApprovalRouter } from './user-approval.routes.js';
 import { createProfileRouter } from './profile.routes.js';
 // Middleware factories
 import { createRequireAuth } from '../middleware/require-auth.js';
+import { createRequireInternalSecret } from '../middleware/require-internal.secret.js';
 
 // Repositories
 import { UserRepository } from '../repositories/user.repository.js';
 import { AuthIdentityRepository } from '../repositories/auth-identity.repository.js';
 import { ProjectRepository } from '../repositories/project.repository.js';
+import { AnalysisRepository } from '../repositories/analysis.repository.js';
 
 // Functional service factories
 import { createAuthService } from '../services/auth/auth.service.js';
@@ -25,6 +29,8 @@ import { createGithubOAuthService } from '../services/auth/github-oauth.service.
 import { createSessionTokenService } from '../services/auth/session-token.service.js';
 import { createProjectService } from '../services/project/project.service.js';
 import { createRepositoryLinkService } from '../services/repository-link/repository-link.service.js';
+import { createAnalysisService } from '../services/analysis/analysis.service.js';
+import { createN8nAnalysisTrigger } from '../services/analysis/n8n-analysis-trigger.js';
 import { createUserService } from '../services/users/user.service.js';
 import { createUserApprovalService } from '../services/users/user-approval.service.js';
 import { createProfileService } from '../services/profile/profile.service.js';
@@ -47,6 +53,7 @@ export function createApiRouter(): Router {
   const users = new UserRepository();
   const identities = new AuthIdentityRepository();
   const projects = new ProjectRepository();
+  const analyses = new AnalysisRepository();
 
   // Shared services
   const sessions = createSessionTokenService(env.sessionSecret);
@@ -56,6 +63,12 @@ export function createApiRouter(): Router {
   const projectService = createProjectService(projects);
   const profileService = createProfileService(users);
   const repositoryLink = createRepositoryLinkService(projects);
+  const analysisTrigger = createN8nAnalysisTrigger(
+    env.n8nAnalysisWebhookUrl,
+    env.n8nSharedSecret,
+  );
+  const analysisService = createAnalysisService(analyses, projects, analysisTrigger);
+  const requireInternalSecret = createRequireInternalSecret(env.n8nSharedSecret);
   const githubOAuthService = createGithubOAuthService(
     env.githubClientId,
     env.githubClientSecret,
@@ -111,7 +124,11 @@ export function createApiRouter(): Router {
   // User project management
   router.use('/projects', createProjectRouter(projectService, requireAuth));
   router.use('/projects', createRepositoryLinkRouter(repositoryLink, requireAuth));
-
+  router.use('/projects', createAnalysisRouter(analysisService, requireAuth));
+  router.use(
+    '/internal/analyses',
+    createAnalysisInternalRouter(analysisService, requireInternalSecret),
+  );
   // Self-scoped profile (self-vs-admin read: mounted at /profile)
   router.use('/profile', createProfileRouter(profileService, requireAuth));
 

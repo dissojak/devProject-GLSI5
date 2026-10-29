@@ -34,6 +34,15 @@ export const swaggerDocument = {
       description: 'Gestion des projets de l’utilisateur connecté',
     },
     {
+      name: 'Analyses',
+      description: 'Analyse du dépôt GitHub d’un projet (workflow 1)',
+    },
+    {
+      name: 'Internal - Analysis workflow',
+      description:
+        'Callbacks appelés par n8n. Protégés par le secret partagé (header x-internal-secret), jamais par le JWT.',
+    },
+    {
       name: 'Profile',
       description: 'Profil et mot de passe de l’utilisateur connecté',
     },
@@ -471,6 +480,198 @@ export const swaggerDocument = {
   },
 },
 
+    '/api/v1/projects/{projectId}/analyses': {
+      post: {
+        tags: ['Analyses'],
+        summary: 'Lancer l’analyse du dépôt d’un projet',
+        description:
+          'Crée une analyse PENDING puis déclenche le workflow n8n. Réponse immédiate 202 : ' +
+          'l’analyse passe ensuite à RUNNING puis COMPLETED ou FAILED via les callbacks internes. ' +
+          'Refusé si le projet n’a pas de dépôt lié (404) ou si une analyse est déjà en cours (409). ' +
+          'Si n8n est injoignable ou refuse l’appel, ou si le dépôt n’est pas vérifié, ' +
+          'la réponse est 422 (INVARIANT_VIOLATION).',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ $ref: '#/components/parameters/AnalysisProjectId' }],
+        responses: {
+          '202': {
+            description: 'Analyse créée (statut PENDING), workflow déclenché',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AnalysisResponse' },
+              },
+            },
+          },
+          '400': { $ref: '#/components/responses/ValidationError' },
+          '401': { $ref: '#/components/responses/Unauthorized' },
+          '404': { $ref: '#/components/responses/NotFound' },
+          '409': {
+            description: 'Une analyse est déjà en cours pour ce projet',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+              },
+            },
+          },
+          '422': {
+            description: 'Workflow n8n injoignable ou refus (analyse marquée FAILED), ou dépôt non vérifié',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+              },
+            },
+          },
+        },
+      },
+
+      get: {
+        tags: ['Analyses'],
+        summary: 'Lister les analyses d’un projet',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { $ref: '#/components/parameters/AnalysisProjectId' },
+          {
+            name: 'page',
+            in: 'query',
+            schema: { type: 'integer', minimum: 1, default: 1 },
+          },
+          {
+            name: 'limit',
+            in: 'query',
+            schema: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+          },
+        ],
+        responses: {
+          '200': {
+            description: 'Liste paginée des analyses',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AnalysisListResponse' },
+              },
+            },
+          },
+          '400': { $ref: '#/components/responses/ValidationError' },
+          '401': { $ref: '#/components/responses/Unauthorized' },
+          '404': { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+
+    '/api/v1/projects/{projectId}/analyses/{analysisId}': {
+      get: {
+        tags: ['Analyses'],
+        summary: 'Consulter une analyse',
+        description:
+          'Retourne le statut et le résultat. Le frontend interroge cette route (polling) tant que le statut est PENDING ou RUNNING.',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { $ref: '#/components/parameters/AnalysisProjectId' },
+          { $ref: '#/components/parameters/AnalysisId' },
+        ],
+        responses: {
+          '200': {
+            description: 'Analyse trouvée',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AnalysisResponse' },
+              },
+            },
+          },
+          '400': { $ref: '#/components/responses/ValidationError' },
+          '401': { $ref: '#/components/responses/Unauthorized' },
+          '404': { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+
+    '/api/v1/internal/analyses/{analysisId}/start': {
+      post: {
+        tags: ['Internal - Analysis workflow'],
+        summary: 'Callback n8n : démarrer l’analyse',
+        description: 'Transition PENDING vers RUNNING. Appelé par n8n, sans corps.',
+        security: [{ internalSecret: [] }],
+        parameters: [{ $ref: '#/components/parameters/AnalysisId' }],
+        responses: {
+          '200': {
+            description: 'Analyse démarrée (RUNNING)',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AnalysisResponse' },
+              },
+            },
+          },
+          '400': { $ref: '#/components/responses/ValidationError' },
+          '401': { description: 'Secret interne manquant ou invalide' },
+          '404': { $ref: '#/components/responses/NotFound' },
+          '409': { description: 'Transition de statut invalide' },
+        },
+      },
+    },
+
+    '/api/v1/internal/analyses/{analysisId}/complete': {
+      post: {
+        tags: ['Internal - Analysis workflow'],
+        summary: 'Callback n8n : terminer l’analyse avec son résultat',
+        description:
+          'Transition RUNNING vers COMPLETED. Une technologie (nom + catégorie) ou un composant (nom) en double renvoie 409.',
+        security: [{ internalSecret: [] }],
+        parameters: [{ $ref: '#/components/parameters/AnalysisId' }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/CompleteAnalysisInput' },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'Analyse terminée (COMPLETED)',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AnalysisResponse' },
+              },
+            },
+          },
+          '400': { $ref: '#/components/responses/ValidationError' },
+          '401': { description: 'Secret interne manquant ou invalide' },
+          '404': { $ref: '#/components/responses/NotFound' },
+          '409': { description: 'Transition invalide ou doublon dans le résultat' },
+        },
+      },
+    },
+
+    '/api/v1/internal/analyses/{analysisId}/fail': {
+      post: {
+        tags: ['Internal - Analysis workflow'],
+        summary: 'Callback n8n : marquer l’analyse en échec',
+        description: 'Transition PENDING ou RUNNING vers FAILED, avec un code et un message d’erreur.',
+        security: [{ internalSecret: [] }],
+        parameters: [{ $ref: '#/components/parameters/AnalysisId' }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/FailAnalysisInput' },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'Analyse en échec (FAILED)',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AnalysisResponse' },
+              },
+            },
+          },
+          '400': { $ref: '#/components/responses/ValidationError' },
+          '401': { description: 'Secret interne manquant ou invalide' },
+          '404': { $ref: '#/components/responses/NotFound' },
+          '409': { description: 'Transition de statut invalide' },
+        },
+      },
+    },
+
     '/api/v1/profile': {
       get: {
         tags: ['Profile'],
@@ -751,6 +952,22 @@ export const swaggerDocument = {
 
   components: {
     parameters: {
+      AnalysisProjectId: {
+        name: 'projectId',
+        in: 'path',
+        required: true,
+        description: 'Identifiant du projet (24 caractères hexadécimaux)',
+        schema: { type: 'string', pattern: '^[0-9a-fA-F]{24}$' },
+        example: '507f1f77bcf86cd799439011',
+      },
+      AnalysisId: {
+        name: 'analysisId',
+        in: 'path',
+        required: true,
+        description: 'Identifiant de l’analyse (24 caractères hexadécimaux)',
+        schema: { type: 'string', pattern: '^[0-9a-fA-F]{24}$' },
+        example: '507f1f77bcf86cd799439012',
+      },
       ProjectId: {
         name: 'id',
         in: 'path',
@@ -1075,6 +1292,165 @@ export const swaggerDocument = {
           },
         },
       },
+      AnalysisTechnology: {
+        type: 'object',
+        required: ['name', 'category'],
+        properties: {
+          name: { type: 'string', example: 'FastAPI' },
+          version: { type: 'string', example: '0.110.0' },
+          category: {
+            type: 'string',
+            description: 'Valeur de TECHNOLOGY_CATEGORIES',
+            example: 'framework',
+          },
+          sourceFile: { type: 'string', example: 'requirements.txt' },
+        },
+      },
+
+      AnalysisComponent: {
+        type: 'object',
+        required: ['name', 'type', 'rootPath'],
+        properties: {
+          name: { type: 'string', example: 'backend' },
+          type: {
+            type: 'string',
+            description: 'Valeur de ANALYZED_COMPONENT_TYPES',
+            example: 'BACKEND',
+          },
+          rootPath: { type: 'string', example: '.' },
+        },
+      },
+
+      AnalysisDockerFinding: {
+        type: 'object',
+        required: ['ruleId', 'severity', 'message'],
+        properties: {
+          ruleId: { type: 'string', example: 'DL3006' },
+          severity: {
+            type: 'string',
+            description: 'Valeur de DOCKER_FINDING_SEVERITIES',
+            example: 'WARNING',
+          },
+          message: { type: 'string', example: 'Always tag the version of an image explicitly' },
+          file: { type: 'string', example: 'Dockerfile' },
+          line: { type: 'integer', minimum: 1, example: 1 },
+        },
+      },
+
+      AnalysisDocker: {
+        type: 'object',
+        required: ['hasDockerfile', 'hasCompose', 'findings'],
+        properties: {
+          hasDockerfile: { type: 'boolean', example: true },
+          hasCompose: { type: 'boolean', example: false },
+          findings: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/AnalysisDockerFinding' },
+          },
+        },
+      },
+
+      Analysis: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', example: '507f1f77bcf86cd799439012' },
+          project: { type: 'string', example: '507f1f77bcf86cd799439011' },
+          requestedBy: { type: 'string', example: '507f191e810c19729de860ea' },
+          status: {
+            type: 'string',
+            enum: ['PENDING', 'RUNNING', 'COMPLETED', 'FAILED'],
+            example: 'COMPLETED',
+          },
+          branch: { type: 'string', example: 'main' },
+          detectedFiles: {
+            type: 'array',
+            items: { type: 'string' },
+            example: ['requirements.txt', 'dockerfile'],
+          },
+          technologies: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/AnalysisTechnology' },
+          },
+          components: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/AnalysisComponent' },
+          },
+          docker: { $ref: '#/components/schemas/AnalysisDocker' },
+          error: {
+            type: 'object',
+            description: 'Présent seulement si le statut est FAILED',
+            properties: {
+              code: { type: 'string', example: 'WORKFLOW_ERROR' },
+              message: { type: 'string', example: 'GitHub request failed (404)' },
+            },
+          },
+          startedAt: { type: 'string', format: 'date-time', nullable: true },
+          finishedAt: { type: 'string', format: 'date-time', nullable: true },
+          durationMs: { type: 'integer', example: 1052 },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
+        },
+      },
+
+      AnalysisResponse: {
+        type: 'object',
+        properties: {
+          message: { type: 'string', example: 'Analysis retrieved' },
+          data: { $ref: '#/components/schemas/Analysis' },
+        },
+      },
+
+      AnalysisListResponse: {
+        type: 'object',
+        properties: {
+          message: { type: 'string', example: 'Analyses retrieved' },
+          data: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/Analysis' },
+          },
+          pagination: {
+            type: 'object',
+            properties: {
+              page: { type: 'integer', example: 1 },
+              limit: { type: 'integer', example: 20 },
+              total: { type: 'integer', example: 3 },
+              pageCount: { type: 'integer', example: 1 },
+            },
+          },
+        },
+      },
+
+      CompleteAnalysisInput: {
+        type: 'object',
+        properties: {
+          detectedFiles: {
+            type: 'array',
+            items: { type: 'string' },
+            example: ['requirements.txt', 'dockerfile'],
+          },
+          technologies: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/AnalysisTechnology' },
+            example: [],
+          },
+          components: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/AnalysisComponent' },
+            example: [],
+          },
+          docker: { $ref: '#/components/schemas/AnalysisDocker' },
+        },
+      },
+
+      FailAnalysisInput: {
+        type: 'object',
+        required: ['code', 'message'],
+        properties: {
+          code: { type: 'string', example: 'WORKFLOW_ERROR' },
+          message: { type: 'string', example: 'Reset during n8n setup' },
+        },
+      },
+
       RegisterResponse: {
         type: 'object',
         properties: {
@@ -1090,6 +1466,14 @@ export const swaggerDocument = {
 
     },
     securitySchemes: {
+    internalSecret: {
+      type: 'apiKey',
+      in: 'header',
+      name: 'x-internal-secret',
+      description:
+        'Secret partagé avec n8n (valeur de N8N_SHARED_SECRET dans backend/.env). ' +
+        'Réservé aux routes /api/v1/internal/*.',
+    },
     bearerAuth: {
       type: 'http',
       scheme: 'bearer',
