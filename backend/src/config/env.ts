@@ -30,6 +30,14 @@ const RawEnvSchema = z.object({
     .string()
     .trim()
     .min(32, 'SESSION_SECRET must be at least 32 bytes'),
+  N8N_ANALYSIS_WEBHOOK_URL: z
+    .string()
+    .trim()
+    .url('N8N_ANALYSIS_WEBHOOK_URL must be a valid URL'),
+  N8N_SHARED_SECRET: z
+    .string()
+    .trim()
+    .min(32, 'N8N_SHARED_SECRET must be at least 32 bytes'),
 });
 
 export type Env = {
@@ -44,6 +52,8 @@ export type Env = {
   githubCallbackUrl: string;
   frontendUrl: string;
   sessionSecret: string;
+  n8nAnalysisWebhookUrl: string;
+  n8nSharedSecret: string;
 };
 
 let cachedEnv: Env | undefined;
@@ -88,6 +98,8 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     githubCallbackUrl: parsed.data.GITHUB_CALLBACK_URL,
     frontendUrl: parsed.data.FRONTEND_URL,
     sessionSecret: parsed.data.SESSION_SECRET,
+    n8nAnalysisWebhookUrl: parsed.data.N8N_ANALYSIS_WEBHOOK_URL,
+    n8nSharedSecret: parsed.data.N8N_SHARED_SECRET,
   };
 }
 
