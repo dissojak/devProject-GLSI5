@@ -1,11 +1,13 @@
-import { Types } from 'mongoose';
+import { Types, type QueryFilter } from 'mongoose';
 
+import type { AnalysisFields } from '../models/entities/analysis.model.js';
 import type { AnalysisStatus } from '../domain/enums/analysis.enums.js';
 import {
   Analysis,
   type AnalysisDocument,
   type ProjectDocument,
 } from '../models/entities/index.js';
+import type { RepositoryOptions } from './base.repository.js';
 
 const ACTIVE_STATUSES = ['PENDING', 'RUNNING'] as const satisfies readonly AnalysisStatus[];
 const ACTIVE_WINDOW_MS = 15 * 60 * 1000;
@@ -34,6 +36,36 @@ export class AnalysisRepository {
     });
 
     return found !== null;
+  }
+
+  /** Newest analysis of a project whatever its status (latest snapshot). */
+  async findLatestByProject(
+    projectId: Types.ObjectId | string,
+    options: RepositoryOptions = {},
+  ): Promise<AnalysisDocument | null> {
+    const query = Analysis.findOne({ project: projectId })
+      .sort({ createdAt: -1 })
+      .session(options.session ?? null);
+    if (options.withDeleted) {
+      query.setOptions({ withDeleted: true });
+    }
+
+    return (await query.exec()) as unknown as AnalysisDocument | null;
+  }
+
+  /** All analyses of a project, newest first (status-agnostic history). */
+  async listByProject(
+    projectId: Types.ObjectId | string,
+    options: RepositoryOptions = {},
+  ): Promise<AnalysisDocument[]> {
+    const query = Analysis.find({ project: projectId })
+      .sort({ createdAt: -1 })
+      .session(options.session ?? null);
+    if (options.withDeleted) {
+      query.setOptions({ withDeleted: true });
+    }
+
+    return (await query.exec()) as unknown as AnalysisDocument[];
   }
 
   async findForWorkflow(analysisId: string): Promise<AnalysisDocument | null> {
@@ -72,5 +104,19 @@ export class AnalysisRepository {
     ]);
 
     return { items: items as unknown as AnalysisDocument[], total };
+  }
+
+  /**
+   * Existence probe. Unknown filter keys throw at the model boundary
+   * (`strictQuery: 'throw'`), never silently strip.
+   */
+  async exists(
+    filter: QueryFilter<AnalysisFields>,
+    options: RepositoryOptions = {},
+  ): Promise<boolean> {
+    const query = Analysis.exists(filter as never).session(options.session ?? null);
+    const found = await query.exec();
+
+    return found !== null;
   }
 }

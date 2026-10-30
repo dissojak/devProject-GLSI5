@@ -14,6 +14,8 @@ const VALID = {
   GITHUB_CALLBACK_URL: 'http://localhost:4000/api/v1/auth/github/callback',
   FRONTEND_URL: 'http://localhost:3000',
   SESSION_SECRET: 'test-session-secret-that-is-at-least-32-bytes-long',
+  N8N_ANALYSIS_WEBHOOK_URL: 'http://localhost:5678/webhook/pipeline-analysis',
+  N8N_SHARED_SECRET: 'test-n8n-shared-secret-that-is-at-least-32-bytes-long',
 };
 
 describe('config/env', () => {
@@ -60,7 +62,7 @@ describe('config/env', () => {
     );
   });
 
-  it('exposes the parsed OAuth and session values on the env object', () => {
+  it('exposes the parsed OAuth, n8n and session values on the env object', () => {
     const env = loadEnv(VALID);
 
     expect(env.githubClientId).toBe('test-client-id');
@@ -68,6 +70,8 @@ describe('config/env', () => {
     expect(env.githubCallbackUrl).toBe('http://localhost:4000/api/v1/auth/github/callback');
     expect(env.frontendUrl).toBe('http://localhost:3000');
     expect(env.sessionSecret).toBe('test-session-secret-that-is-at-least-32-bytes-long');
+    expect(env.n8nAnalysisWebhookUrl).toBe('http://localhost:5678/webhook/pipeline-analysis');
+    expect(env.n8nSharedSecret).toBe('test-n8n-shared-secret-that-is-at-least-32-bytes-long');
   });
 
   it('rejects an empty CORS_ORIGINS list', () => {
