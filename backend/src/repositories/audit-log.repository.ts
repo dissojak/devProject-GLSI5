@@ -1,12 +1,25 @@
 import type { Types } from 'mongoose';
 
-import { type AuditLevel } from '../domain/enums/audit.enums.js';
+import type { AuditAction, AuditLevel } from '../domain/enums/audit.enums.js';
 import { AuditLog, type AuditLogDocument, type AuditLogFields } from '../models/entities/index.js';
 import { BaseRepository, type RepositoryOptions } from './base.repository.js';
+
+export interface AuditRecordInput {
+  actor?: Types.ObjectId | null;
+  action: AuditAction;
+  level?: AuditLevel;
+  entity: { type: string; id: Types.ObjectId };
+  message?: string;
+  metadata?: Record<string, unknown>;
+}
 
 export class AuditLogRepository extends BaseRepository<AuditLogFields, object> {
   constructor() {
     super(AuditLog);
+  }
+
+  record(input: AuditRecordInput): Promise<AuditLogDocument> {
+    return AuditLog.record(input);
   }
 
   /** History of one entity, newest first. */

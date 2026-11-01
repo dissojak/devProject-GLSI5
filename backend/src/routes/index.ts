@@ -7,7 +7,10 @@ import { createAuthRouter } from './auth.routes.js';
 import { createGithubAuthRouter } from './github-auth.routes.js';
 import { createProjectRouter } from './project.routes.js';
 import { createRepositoryLinkRouter } from './repository-link.routes.js';
-import { createAnalysisRouter } from './analysis.routes.js';
+import { createRecommendationRouter } from './recommendation.routes.js';
+import { createRecommendationInternalRouter } from './recommendation-internal.routes.js';
+import { createAiAuditRouter } from './ai-audit.routes.js';
+import { createAiAuditInternalRouter } from './ai-audit-internal.routes.js';
 import { createAnalysisInternalRouter } from './analysis-internal.routes.js';
 import { createUsersRouter } from './users.routes.js';
 import { createUserApprovalRouter } from './user-approval.routes.js';
@@ -21,6 +24,8 @@ import { UserRepository } from '../repositories/user.repository.js';
 import { AuthIdentityRepository } from '../repositories/auth-identity.repository.js';
 import { ProjectRepository } from '../repositories/project.repository.js';
 import { AnalysisRepository } from '../repositories/analysis.repository.js';
+import { RecommendationRepository } from '../repositories/recommendation.repository.js';
+import { AuditLogRepository } from '../repositories/audit-log.repository.js';
 
 // Functional service factories
 import { createAuthService } from '../services/auth/auth.service.js';
@@ -30,10 +35,14 @@ import { createSessionTokenService } from '../services/auth/session-token.servic
 import { createProjectService } from '../services/project/project.service.js';
 import { createRepositoryLinkService } from '../services/repository-link/repository-link.service.js';
 import { createAnalysisService } from '../services/analysis/analysis.service.js';
+import { createRecommendationService } from '../services/recommendations/recommendation.service.js';
+import { createAiAuditService } from '../services/ai-audit/ai-audit.service.js';
+import { createN8nAiAuditTrigger } from '../services/ai-audit/n8n-ai-audit-trigger.js';
 import { createN8nAnalysisTrigger } from '../services/analysis/n8n-analysis-trigger.js';
 import { createUserService } from '../services/users/user.service.js';
 import { createUserApprovalService } from '../services/users/user-approval.service.js';
 import { createProfileService } from '../services/profile/profile.service.js';
+import { createAnalysisRouter } from './analysis.routes.js';
 
 /**
  * API composition root.
@@ -54,6 +63,8 @@ export function createApiRouter(): Router {
   const identities = new AuthIdentityRepository();
   const projects = new ProjectRepository();
   const analyses = new AnalysisRepository();
+  const recommendations = new RecommendationRepository();
+  const auditLogs = new AuditLogRepository();
 
   // Shared services
   const sessions = createSessionTokenService(env.sessionSecret);
@@ -67,8 +78,17 @@ export function createApiRouter(): Router {
     env.n8nAnalysisWebhookUrl,
     env.n8nSharedSecret,
   );
-  const analysisService = createAnalysisService(analyses, projects, analysisTrigger);
-  const requireInternalSecret = createRequireInternalSecret(env.n8nSharedSecret);
+  const recommendationService = createRecommendationService(recommendations, analyses, auditLogs);
+  const aiAuditTrigger = createN8nAiAuditTrigger(env.n8nAiAuditWebhookUrl, env.n8nSharedSecret);
+  const aiAuditService = createAiAuditService(aiAuditTrigger, analyses, projects, auditLogs);
+  const analysisService = createAnalysisService(
+    analyses,
+    projects,
+    analysisTrigger,
+    recommendationService,
+    auditLogs,
+  );
+   const requireInternalSecret = createRequireInternalSecret(env.n8nSharedSecret);
   const githubOAuthService = createGithubOAuthService(
     env.githubClientId,
     env.githubClientSecret,
@@ -125,9 +145,20 @@ export function createApiRouter(): Router {
   router.use('/projects', createProjectRouter(projectService, requireAuth));
   router.use('/projects', createRepositoryLinkRouter(repositoryLink, requireAuth));
   router.use('/projects', createAnalysisRouter(analysisService, requireAuth));
-  router.use(
+  router.use('/projects', createRecommendationRouter(recommendationService, requireAuth));
+    router.use('/projects', createAiAuditRouter(aiAuditService, requireAuth));
+
+   router.use(
     '/internal/analyses',
     createAnalysisInternalRouter(analysisService, requireInternalSecret),
+  );
+  router.use(
+    '/internal/analyses',
+    createRecommendationInternalRouter(recommendationService, requireInternalSecret),
+  );
+    router.use(
+    '/internal/analyses',
+    createAiAuditInternalRouter(aiAuditService, requireInternalSecret),
   );
   // Self-scoped profile (self-vs-admin read: mounted at /profile)
   router.use('/profile', createProfileRouter(profileService, requireAuth));
