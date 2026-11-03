@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { cn } from "@/utils/class-names";
@@ -109,9 +111,9 @@ export function ProjectCard({
       <div>
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2.5">
-            <span className="truncate font-display text-[18px] font-bold text-frost">
+            <Link href={`/projects/${row.id}`} className="truncate font-display text-[18px] font-bold text-frost hover:text-ice">
               {row.name}
-            </span>
+            </Link>
             <span
               className={cn(
                 "shrink-0 rounded-full px-2.5 py-0.5 font-mono text-label-sm font-semibold tracking-wide",

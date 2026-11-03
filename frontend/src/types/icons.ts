@@ -68,4 +68,7 @@ export type MaterialIconName =
   | "menu_book"
   | "open_in_new"
   | "lock_clock"
-  | "refresh";
+  | "refresh"
+  | "chevron_right"
+  | "expand_less"
+  | "filter_list";

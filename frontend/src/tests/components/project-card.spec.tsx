@@ -130,7 +130,7 @@ describe("project card", () => {
 
   it("renders no repository link when the project is not linked", () => {
     render(<ProjectCard row={SAMPLE_PROJECT_ROW} onEdit={vi.fn()} onDelete={vi.fn()} onConnect={vi.fn()} />);
-    expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.queryByRole("link", { name: /octocat/i })).toBeNull();
   });
 
   it("disables the delete entry while its request is pending", () => {
