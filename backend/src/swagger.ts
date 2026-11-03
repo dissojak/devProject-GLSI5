@@ -1663,6 +1663,7 @@ export const swaggerDocument = {
         type: 'object',
         properties: {
           id: { type: 'string', example: '507f1f77bcf86cd799439012' },
+          number: { type: 'integer', minimum: 1, example: 3 },
           project: { type: 'string', example: '507f1f77bcf86cd799439011' },
           requestedBy: { type: 'string', example: '507f191e810c19729de860ea' },
           status: {

@@ -57,6 +57,7 @@ export interface AnalysisDocker {
 
 export interface AnalysisFields {
   project: Types.ObjectId;
+  number: number;
   requestedBy: Types.ObjectId;
   status: AnalysisStatus;
   branch: string;
@@ -160,6 +161,7 @@ const analysisSchema = new Schema<
 >(
   {
     project: { type: Schema.Types.ObjectId, required: true, ref: 'Project' },
+    number: { type: Number, required: true, min: 1 },
     requestedBy: { type: Schema.Types.ObjectId, required: true, ref: 'User' },
     status: { type: String, required: true, enum: ANALYSIS_STATUSES, default: 'PENDING' },
     branch: { type: String, required: true, trim: true, minlength: 1 },
@@ -178,6 +180,7 @@ const analysisSchema = new Schema<
 );
 
 analysisSchema.index({ project: 1, createdAt: -1 });
+analysisSchema.index({ project: 1, number: 1 }, { unique: true });
 analysisSchema.index({ requestedBy: 1 });
 
 const assertNoDuplicateTechnologies = (technologies: AnalysisTechnology[]): void => {
@@ -217,8 +220,11 @@ analysisSchema.statics.request = async function request(
     throw new InvariantViolationError('Project has no verified repository');
   }
 
+  const existingCount = await this.countDocuments({ project: input.project.id });
+
   return new this({
     project: input.project.id as Types.ObjectId,
+    number: existingCount + 1,
     requestedBy: input.userId,
     branch: repository.branch,
   }).save() as unknown as Promise<AnalysisDocument>;
