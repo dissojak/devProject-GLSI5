@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { cn } from "@/utils/class-names";
 import {
   CARD_ACTION_ROW,
@@ -52,7 +53,10 @@ function CardMenu({
         >
           <button
             type="button"
-            onClick={onEdit}
+            onClick={(event) => {
+              event.stopPropagation();
+              onEdit();
+            }}
             className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left font-display text-body-sm text-frost transition-colors hover:bg-surface-mid"
           >
             <MaterialIcon name="edit" className="text-[16px]" />
@@ -60,7 +64,10 @@ function CardMenu({
           </button>
           <button
             type="button"
-            onClick={onConnect}
+            onClick={(event) => {
+              event.stopPropagation();
+              onConnect();
+            }}
             disabled={pending}
             className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left font-display text-body-sm text-frost transition-colors hover:bg-surface-mid"
           >
@@ -73,7 +80,10 @@ function CardMenu({
           </button>
           <button
             type="button"
-            onClick={onDelete}
+            onClick={(event) => {
+              event.stopPropagation();
+              onDelete();
+            }}
             disabled={pending}
             className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left font-display text-body-sm text-rose transition-colors hover:bg-ember/20"
           >
@@ -100,18 +110,32 @@ export function ProjectCard({
   onConnect: (row: ProjectRow) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const router = useRouter();
   const closeMenu = () => setMenuOpen(false);
   const repository = row.repository;
 
   return (
     <motion.div
       variants={CARD_VARIANTS}
-      className="relative flex min-h-[178px] flex-col justify-between rounded-2xl bg-surface-high/95 p-5 shadow-lg transition-shadow duration-200 hover:shadow-teal-glow"
+      onClick={() => router.push(`/projects/${row.id}`)}
+      role="link"
+      tabIndex={0}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          router.push(`/projects/${row.id}`);
+        }
+      }}
+      className="relative flex min-h-[178px] cursor-pointer flex-col justify-between rounded-2xl bg-surface-high/95 p-5 shadow-lg transition-shadow duration-200 hover:shadow-teal-glow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ice/40"
     >
       <div>
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2.5">
-            <Link href={`/projects/${row.id}`} className="truncate font-display text-[18px] font-bold text-frost hover:text-ice">
+            <Link
+              href={`/projects/${row.id}`}
+              onClick={(event) => event.stopPropagation()}
+              className="truncate font-display text-[18px] font-bold text-frost hover:text-ice"
+            >
               {row.name}
             </Link>
             <span
@@ -129,7 +153,10 @@ export function ProjectCard({
               aria-label={CARD_ACTION_ROW.menuLabel}
               aria-expanded={menuOpen}
               aria-haspopup="menu"
-              onClick={() => setMenuOpen((open) => !open)}
+              onClick={(event) => {
+                event.stopPropagation();
+                setMenuOpen((open) => !open);
+              }}
               className={cn(
                 "-mr-1 rounded-md p-1 transition-colors",
                 menuOpen ? "bg-surface-highest text-frost" : "text-smoke hover:text-frost",
@@ -170,6 +197,7 @@ export function ProjectCard({
             href={repositoryUrlOf(repository)}
             target="_blank"
             rel="noreferrer"
+            onClick={(event) => event.stopPropagation()}
             title={CARD_ACTION_ROW.repositoryOpenLabel}
             aria-label={`${repositorySummaryOf(repository)} — ${
               repository.isValid

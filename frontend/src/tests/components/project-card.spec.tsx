@@ -11,6 +11,10 @@ vi.mock("next/link", () => ({
     React.createElement("a", { href, className }, children),
 }));
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
+}));
+
 const SAMPLE_PROJECT_ROW: ProjectRow = {
   id: "fixture-store",
   name: "fixture-store",
@@ -119,13 +123,14 @@ describe("project card", () => {
 
   it("renders the verified repository link when a repository is linked", () => {
     render(<ProjectCard row={LINKED_ROW} onEdit={vi.fn()} onDelete={vi.fn()} onConnect={vi.fn()} />);
-    const link = screen.getByRole("link", { name: /octocat\/Hello-World/i });
+    const link = screen
+      .getAllByRole("link")
+      .find((node) => node.getAttribute("href") === "https://github.com/octocat/Hello-World");
+    if (!link) throw new Error("repository link missing");
     expect(link.getAttribute("href")).toBe("https://github.com/octocat/Hello-World");
     expect(link.getAttribute("target")).toBe("_blank");
     expect(link.textContent).toContain("octocat/Hello-World");
-    expect(screen.queryByRole("link", { name: /octocat\/Hello-World/i })?.getAttribute("aria-label")).toContain(
-      "verified",
-    );
+    expect(link.getAttribute("aria-label")).toContain("verified");
   });
 
   it("renders no repository link when the project is not linked", () => {

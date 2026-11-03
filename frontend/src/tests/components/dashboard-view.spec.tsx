@@ -14,6 +14,12 @@ vi.mock("next/link", () => ({
     React.createElement("a", { href, className }, children),
 }));
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+  useParams: () => ({}),
+}));
+
 beforeAll(() => {
   stubMotionEnvironment();
 });
@@ -391,7 +397,9 @@ describe("dashboard view", () => {
       branch: "main",
     });
     expect(connection.authorization).toBe("Bearer token-1");
-    expect(screen.getByRole("link", { name: /octocat\/Hello-World/i })).toBeTruthy();
+    expect(
+      screen.getAllByRole("link").some((node) => node.getAttribute("href") === "https://github.com/octocat/Hello-World"),
+    ).toBe(true);
   });
 
   it("re-verifies an invalid repository from the linked panel", async () => {
