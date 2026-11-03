@@ -194,6 +194,9 @@ const decide = async (
   return recommendation.save() as unknown as Promise<RecommendationDocument>;
 };
 
+/** Indexes declared as data: one row per query plan the repositories rely on. */
+recommendationSchema.index({ analysis: 1, createdAt: -1 });
+
 recommendationSchema.methods.accept = async function accept(
   this: RecommendationDocument,
   user: Types.ObjectId,

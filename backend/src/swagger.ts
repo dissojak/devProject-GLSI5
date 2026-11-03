@@ -38,6 +38,20 @@ export const swaggerDocument = {
       description: 'Analyse du dépôt GitHub d’un projet (workflow 1)',
     },
     {
+      name: 'Recommendations',
+      description:
+        'Recommandations issues de l’audit local (règles) ou d’un audit IA, avec décision du développeur',
+    },
+    {
+      name: 'AI Audit',
+      description: 'Lancement de l’audit IA par n8n sur une analyse terminée (workflow 1)',
+    },
+    {
+      name: 'Internal - AI audit and recommendations',
+      description:
+        'Callbacks appelés par n8n. Protégés par le secret partagé (header x-internal-secret), jamais par le JWT.',
+    },
+    {
       name: 'Internal - Analysis workflow',
       description:
         'Callbacks appelés par n8n. Protégés par le secret partagé (header x-internal-secret), jamais par le JWT.',
@@ -583,6 +597,156 @@ export const swaggerDocument = {
       },
     },
 
+    '/api/v1/projects/{projectId}/analyses/{analysisId}/recommendations': {
+      get: {
+        tags: ['Recommendations'],
+        summary: 'Lister les recommandations d’une analyse',
+        description:
+          'Ordre décroissant de création. Chaque item porte son origine (règles internes ou audit IA) et son statut décision.',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { $ref: '#/components/parameters/AnalysisProjectId' },
+          { $ref: '#/components/parameters/AnalysisId' },
+        ],
+        responses: {
+          '200': {
+            description: 'Recommandations de l’analyse',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/RecommendationListResponse' },
+              },
+            },
+          },
+          '400': { $ref: '#/components/responses/ValidationError' },
+          '401': { $ref: '#/components/responses/Unauthorized' },
+          '404': { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+
+    '/api/v1/projects/{projectId}/analyses/{analysisId}/audit': {
+      post: {
+        tags: ['Recommendations'],
+        summary: 'Exécuter l’audit local (règles) d’une analyse terminée',
+        description:
+          'Génère les recommandations manquantes à partir des findings de l’analyse (dédupliquées), puis les liste.',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { $ref: '#/components/parameters/AnalysisProjectId' },
+          { $ref: '#/components/parameters/AnalysisId' },
+        ],
+        responses: {
+          '200': {
+            description: 'Audit exécuté',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/RecommendationAuditResponse' },
+              },
+            },
+          },
+          '400': { $ref: '#/components/responses/ValidationError' },
+          '401': { $ref: '#/components/responses/Unauthorized' },
+          '404': { $ref: '#/components/responses/NotFound' },
+          '422': { description: 'L’analyse n’est pas au statut COMPLETED' },
+        },
+      },
+    },
+
+    '/api/v1/projects/{projectId}/analyses/{analysisId}/recommendations/{recommendationId}/accept': {
+      post: {
+        tags: ['Recommendations'],
+        summary: 'Accepter une recommandation',
+        description: 'Transition PENDING → ACCEPTED (une seule décision possible).',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { $ref: '#/components/parameters/AnalysisProjectId' },
+          { $ref: '#/components/parameters/AnalysisId' },
+          { $ref: '#/components/parameters/RecommendationId' },
+        ],
+        responses: {
+          '200': {
+            description: 'Recommandation acceptée',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/RecommendationResponse' },
+              },
+            },
+          },
+          '400': { $ref: '#/components/responses/ValidationError' },
+          '401': { $ref: '#/components/responses/Unauthorized' },
+          '404': { $ref: '#/components/responses/NotFound' },
+          '409': { description: 'Décision déjà prise (ACCEPTED ou REJECTED)' },
+        },
+      },
+    },
+
+    '/api/v1/projects/{projectId}/analyses/{analysisId}/recommendations/{recommendationId}/reject': {
+      post: {
+        tags: ['Recommendations'],
+        summary: 'Rejeter une recommandation',
+        description: 'Transition PENDING → REJECTED, avec une note optionnelle.',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { $ref: '#/components/parameters/AnalysisProjectId' },
+          { $ref: '#/components/parameters/AnalysisId' },
+          { $ref: '#/components/parameters/RecommendationId' },
+        ],
+        requestBody: {
+          required: false,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/RejectRecommendationInput' },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'Recommandation rejetée',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/RecommendationResponse' },
+              },
+            },
+          },
+          '400': { $ref: '#/components/responses/ValidationError' },
+          '401': { $ref: '#/components/responses/Unauthorized' },
+          '404': { $ref: '#/components/responses/NotFound' },
+          '409': { description: 'Décision déjà prise (ACCEPTED ou REJECTED)' },
+        },
+      },
+    },
+
+    '/api/v1/projects/{projectId}/analyses/{analysisId}/audit/ai': {
+      post: {
+        tags: ['AI Audit'],
+        summary: 'Demander un audit IA sur une analyse terminée',
+        description:
+          'Déclenche le workflow n8n d’audit hybride. Une seule exécution à la fois : une demande récente (10 min) répond CONFLICT' +
+          ' tant qu’elle est active (les callbacks enregistrent l’échec ou les recommandations).',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { $ref: '#/components/parameters/AnalysisProjectId' },
+          { $ref: '#/components/parameters/AnalysisId' },
+        ],
+        responses: {
+          '202': {
+            description: 'Audit IA demandé',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AiAuditRequested' },
+              },
+            },
+          },
+          '401': { $ref: '#/components/responses/Unauthorized' },
+          '404': { $ref: '#/components/responses/NotFound' },
+          '409': { description: 'Un audit IA est déjà en cours pour cette analyse' },
+          '422': {
+            description: 'Analyse non terminée ou workflow n8n injoignable (le déclencheur rejette la demande)',
+          },
+        },
+      },
+    },
+
     '/api/v1/internal/analyses/{analysisId}/start': {
       post: {
         tags: ['Internal - Analysis workflow'],
@@ -668,6 +832,96 @@ export const swaggerDocument = {
           '401': { description: 'Secret interne manquant ou invalide' },
           '404': { $ref: '#/components/responses/NotFound' },
           '409': { description: 'Transition de statut invalide' },
+        },
+      },
+    },
+
+    '/api/v1/internal/analyses/{analysisId}/recommendations': {
+      post: {
+        tags: ['Internal - AI audit and recommendations'],
+        summary: 'Callback n8n : enregistrer les recommandations de l’audit IA',
+        description:
+          'Les suggestions IA sont filtrées/dédupliquées; chaque item est persisté avec son origine (provider/model).',
+        security: [{ internalSecret: [] }],
+        parameters: [{ $ref: '#/components/parameters/AnalysisId' }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/AiRecommendationsInput' },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'Recommandations enregistrées',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AiRecommendationRecorded' },
+              },
+            },
+          },
+          '400': { $ref: '#/components/responses/ValidationError' },
+          '401': { description: 'Secret interne manquant ou invalide' },
+          '404': { $ref: '#/components/responses/NotFound' },
+          '422': { description: 'L’analyse n’est pas au statut COMPLETED' },
+        },
+      },
+    },
+
+    '/api/v1/internal/analyses/{analysisId}/context': {
+      get: {
+        tags: ['Internal - AI audit and recommendations'],
+        summary: 'Callback n8n : extraire le contexte d’audit IA d’une analyse',
+        description:
+          'Payload prêt à consommer (dépôt, branche, fichiers détectés, docker findings). Exige un audit IA actif.',
+        security: [{ internalSecret: [] }],
+        parameters: [{ $ref: '#/components/parameters/AnalysisId' }],
+        responses: {
+          '200': {
+            description: 'Contexte de l’analyse',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AiAuditContext' },
+              },
+            },
+          },
+          '400': { $ref: '#/components/responses/ValidationError' },
+          '401': { description: 'Secret interne manquant ou invalide' },
+          '404': { $ref: '#/components/responses/NotFound' },
+          '409': { description: 'Aucun audit IA en cours pour cette analyse' },
+        },
+      },
+    },
+
+    '/api/v1/internal/analyses/{analysisId}/audit-fail': {
+      post: {
+        tags: ['Internal - AI audit and recommendations'],
+        summary: 'Callback n8n : marquer l’audit IA en échec',
+        description: 'Enregistre l’échec dans le journal d’audit (action AI_AUDIT_FAILED).',
+        security: [{ internalSecret: [] }],
+        parameters: [{ $ref: '#/components/parameters/AnalysisId' }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/FailAnalysisInput' },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'Échec de l’audit IA enregistré',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AiAuditFailed' },
+              },
+            },
+          },
+          '400': { $ref: '#/components/responses/ValidationError' },
+          '401': { description: 'Secret interne manquant ou invalide' },
+          '404': { $ref: '#/components/responses/NotFound' },
+          '409': { description: 'Aucun audit IA en cours pour cette analyse' },
         },
       },
     },
@@ -887,6 +1141,53 @@ export const swaggerDocument = {
       },
     },
 
+    '/api/v1/projects/availability': {
+      get: {
+        tags: ['Projects'],
+        summary: 'Vérifier la disponibilité d’un nom de projet',
+        description: 'Sonde case-insensitive (collation, force 2) sur le propriétaire, ' +
+          'utilisée par le parcours de création avant confirmation. ' +
+          'Les projets supprimés logiquement ne bloquent pas le nom. ' +
+          'L’unicité réelle reste garantie par l’index unique (propriété, nom).',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: 'name',
+            in: 'query',
+            required: true,
+            schema: { type: 'string', minLength: 1, maxLength: 120 },
+            description: 'Nom candidat (espaces de bord ignorés)',
+          },
+        ],
+        responses: {
+          '200': {
+            description: 'Disponibilité vérifiée',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['message', 'data'],
+                  properties: {
+                    message: { type: 'string', example: 'Project name availability checked' },
+                    data: {
+                      type: 'object',
+                      required: ['name', 'exists'],
+                      properties: {
+                        name: { type: 'string', example: 'shopflow-store' },
+                        exists: { type: 'boolean', example: false },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          '400': { $ref: '#/components/responses/ValidationError' },
+          '401': { $ref: '#/components/responses/Unauthorized' },
+        },
+      },
+    },
+
     '/api/v1/projects/{id}/repository': {
       put: {
         tags: ['Projects'],
@@ -967,6 +1268,14 @@ export const swaggerDocument = {
         description: 'Identifiant de l’analyse (24 caractères hexadécimaux)',
         schema: { type: 'string', pattern: '^[0-9a-fA-F]{24}$' },
         example: '507f1f77bcf86cd799439012',
+      },
+      RecommendationId: {
+        name: 'recommendationId',
+        in: 'path',
+        required: true,
+        description: 'Identifiant de la recommandation (24 caractères hexadécimaux)',
+        schema: { type: 'string', pattern: '^[0-9a-fA-F]{24}$' },
+        example: '507f1f77bcf86cd799439013',
       },
       ProjectId: {
         name: 'id',
@@ -1448,6 +1757,191 @@ export const swaggerDocument = {
         properties: {
           code: { type: 'string', example: 'WORKFLOW_ERROR' },
           message: { type: 'string', example: 'Reset during n8n setup' },
+        },
+      },
+
+      Recommendation: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', example: '507f1f77bcf86cd799439013' },
+          analysisId: { type: 'string', example: '507f1f77bcf86cd799439012' },
+          generatedBy: {
+            type: 'object',
+            properties: {
+              provider: { type: 'string', example: 'internal' },
+              model: { type: 'string', example: 'audit-rules-v1' },
+            },
+          },
+          type: {
+            type: 'string',
+            enum: ['REPLICAS', 'CPU', 'MEMORY', 'HPA', 'INGRESS', 'DOCKER', 'SECURITY', 'GENERAL'],
+            example: 'SECURITY',
+          },
+          severity: { type: 'string', enum: ['INFO', 'WARNING', 'CRITICAL'], example: 'WARNING' },
+          title: { type: 'string', example: 'Plaintext secret (docker-compose.yml:3)' },
+          description: { type: 'string' },
+          componentName: { type: 'string', example: 'graph-container' },
+          suggestedValue: { type: 'string' },
+          confidence: { type: 'number', minimum: 0, maximum: 1 },
+          proposedFile: {
+            type: 'object',
+            properties: {
+              path: { type: 'string', example: 'deploy/secrets.env' },
+              content: { type: 'string' },
+            },
+          },
+          status: { type: 'string', enum: ['PENDING', 'ACCEPTED', 'REJECTED'], example: 'PENDING' },
+          decisionNote: { type: 'string' },
+          createdAt: { type: 'string', format: 'date-time' },
+        },
+      },
+
+      RecommendationListResponse: {
+        type: 'object',
+        properties: {
+          message: { type: 'string', example: 'Recommendations retrieved' },
+          data: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/Recommendation' },
+          },
+        },
+      },
+
+      RecommendationAuditResponse: {
+        type: 'object',
+        properties: {
+          message: { type: 'string', example: 'Audit completed' },
+          data: {
+            type: 'object',
+            properties: {
+              created: { type: 'integer', example: 1 },
+              recommendations: {
+                type: 'array',
+                items: { $ref: '#/components/schemas/Recommendation' },
+              },
+            },
+          },
+        },
+      },
+
+      RecommendationResponse: {
+        type: 'object',
+        properties: {
+          message: { type: 'string', example: 'Recommendation accepted' },
+          data: { $ref: '#/components/schemas/Recommendation' },
+        },
+      },
+
+      RejectRecommendationInput: {
+        type: 'object',
+        properties: {
+          note: { type: 'string', maxLength: 1000, example: 'Not our deployment target' },
+        },
+      },
+
+      AiAuditRequested: {
+        type: 'object',
+        properties: {
+          message: { type: 'string', example: 'AI audit requested' },
+          data: {
+            type: 'object',
+            properties: {
+              analysisId: { type: 'string', example: '507f1f77bcf86cd799439012' },
+              status: { type: 'string', example: 'REQUESTED' },
+            },
+          },
+        },
+      },
+
+      AiAuditFailed: {
+        type: 'object',
+        properties: {
+          message: { type: 'string', example: 'AI audit failure recorded' },
+          data: {
+            type: 'object',
+            properties: {
+              analysisId: { type: 'string', example: '507f1f77bcf86cd799439012' },
+              status: { type: 'string', example: 'FAILED' },
+            },
+          },
+        },
+      },
+
+      AiRecommendationInputItem: {
+        type: 'object',
+        required: ['type', 'severity', 'title', 'description'],
+        properties: {
+          type: {
+            type: 'string',
+            enum: ['REPLICAS', 'CPU', 'MEMORY', 'HPA', 'INGRESS', 'DOCKER', 'SECURITY', 'GENERAL'],
+          },
+          severity: { type: 'string', enum: ['INFO', 'WARNING', 'CRITICAL'] },
+          title: { type: 'string', maxLength: 200 },
+          description: { type: 'string', maxLength: 2000 },
+          componentName: { type: 'string', maxLength: 200 },
+          suggestedValue: { type: 'string', maxLength: 4000 },
+          confidence: { type: 'number', minimum: 0, maximum: 1 },
+          proposedFile: {
+            type: 'object',
+            required: ['path', 'content'],
+            properties: {
+              path: { type: 'string', maxLength: 300, example: 'deploy/secrets.env' },
+              content: { type: 'string', maxLength: 20000 },
+            },
+          },
+        },
+      },
+
+      AiRecommendationsInput: {
+        type: 'object',
+        required: ['provider', 'model', 'recommendations'],
+        properties: {
+          provider: { type: 'string', maxLength: 100, example: 'openai' },
+          model: { type: 'string', maxLength: 100, example: 'gpt-4o' },
+          recommendations: {
+            type: 'array',
+            maxItems: 50,
+            items: { $ref: '#/components/schemas/AiRecommendationInputItem' },
+          },
+        },
+      },
+
+      AiRecommendationRecorded: {
+        type: 'object',
+        properties: {
+          message: { type: 'string', example: 'Recommendations recorded' },
+          data: {
+            type: 'object',
+            properties: {
+              created: { type: 'integer', example: 3 },
+              skipped: { type: 'integer', example: 1 },
+            },
+          },
+        },
+      },
+
+      AiAuditContext: {
+        type: 'object',
+        properties: {
+          message: { type: 'string', example: 'AI audit context retrieved' },
+          data: {
+            type: 'object',
+            properties: {
+              analysisId: { type: 'string', example: '507f1f77bcf86cd799439012' },
+              repository: {
+                type: 'object',
+                properties: {
+                  owner: { type: 'string', example: 'acme' },
+                  name: { type: 'string', example: 'repo' },
+                },
+              },
+              branch: { type: 'string', example: 'main' },
+              detectedFiles: { type: 'array', items: { type: 'string' } },
+              technologies: { type: 'array', items: { type: 'object' } },
+              components: { type: 'array', items: { type: 'object' } },
+              docker: { $ref: '#/components/schemas/AnalysisDocker' },
+            },
+          },
         },
       },
 
