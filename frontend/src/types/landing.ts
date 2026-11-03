@@ -44,12 +44,6 @@ export interface LandingHeaderCta {
   kind: LandingHeaderCtaKind;
 }
 
-export interface LandingSatellite {
-  id: "replicas" | "argo";
-  floatPath: number[];
-  duration: number;
-}
-
 export interface HeroBadge {
   id: "ai-powered" | "human-validation";
   icon: MaterialIconName;
