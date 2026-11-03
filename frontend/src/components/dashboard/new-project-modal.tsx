@@ -55,33 +55,6 @@ const ENV_SELECTION_BASE =
 const NAME_INPUT_BASE =
   "h-12 w-full rounded-xl border border-steel bg-basin px-4 font-mono text-code-md text-foam outline-none transition-all placeholder:text-mist/60 focus:border-teal focus:ring-1 focus:ring-teal";
 
-function ConflictingProject({ name }: { name: string }) {
-  return (
-    <div
-      id="project-name-conflict"
-      className="mt-2.5 flex flex-col gap-1.5 rounded-xl border border-crimson/40 bg-basin/80 p-3"
-    >
-      <div className="flex items-center justify-between font-mono text-label-md text-mist">
-        <span className="uppercase">{PROJECT_MODAL_ROW.conflictHeading}</span>
-        <span className="text-crimson">{PROJECT_MODAL_ROW.conflictCode}</span>
-      </div>
-      <div className="relative">
-        <input
-          readOnly
-          value={name}
-          aria-label={PROJECT_MODAL_ROW.conflictCodeLabel}
-          className="h-11 w-full cursor-default rounded-[10px] border border-crimson bg-basin px-3.5 font-mono text-code-md text-crimson outline-none select-none"
-        />
-        <MaterialIcon name="error" className="absolute right-3 top-2.5 text-[18px] text-crimson" />
-      </div>
-      <div className="mt-0.5 flex items-center gap-1.5 font-display text-body-sm text-crimson">
-        <MaterialIcon name="warning" className="shrink-0 text-[15px]" />
-        <span>{PROJECT_MODAL_ROW.conflictMessage}</span>
-      </div>
-    </div>
-  );
-}
-
 function EnvironmentMenu({
   open,
   selected,
@@ -181,7 +154,6 @@ export function NewProjectModal({
     enabled: mode === "create",
   });
   const conflict = knownConflict || serverConflict !== null || availability.exists;
-  const conflictName = serverConflict ?? trimmedName;
   const nameError =
     validationErrors.name?.[0] ??
     (conflict ? PROJECT_MODAL_ROW.conflictMessage : undefined);
@@ -422,22 +394,37 @@ export function NewProjectModal({
                   }}
                   placeholder={row.namePlaceholder}
                   disabled={pending}
-                  aria-invalid={conflict || nameError !== undefined}
+                  aria-invalid={nameError !== undefined}
                   aria-describedby={
-                    conflict
-                      ? "project-name-conflict"
-                      : nameError
-                        ? "project-name-error"
-                        : undefined
+                    nameError ? (conflict ? "project-name-conflict" : "project-name-error") : undefined
                   }
-                  className={NAME_INPUT_BASE}
+                  className={cn(
+                    NAME_INPUT_BASE,
+                    nameError &&
+                      "border-crimson focus:border-crimson focus:ring-1 focus:ring-crimson",
+                  )}
                 />
                 <MaterialIcon
-                  name="check_circle"
-                  className="absolute right-3.5 top-3 text-[18px] text-teal"
+                  name={nameError ? "close" : "check_circle"}
+                  className={
+                    nameError
+                      ? "absolute right-3.5 top-3 text-[18px] text-crimson"
+                      : "absolute right-3.5 top-3 text-[18px] text-teal"
+                  }
                 />
               </div>
-              {nameError && !conflict ? (
+              {conflict ? (
+                <div
+                  id="project-name-conflict"
+                  role="alert"
+                  className="mt-2.5 flex items-center gap-2 rounded-xl border border-crimson/40 bg-basin/80 p-3"
+                >
+                  <MaterialIcon name="warning" className="shrink-0 text-[17px] text-crimson" />
+                  <span className="font-display text-body-sm text-crimson">
+                    {PROJECT_MODAL_ROW.conflictMessage}
+                  </span>
+                </div>
+              ) : nameError ? (
                 <div
                   id="project-name-error"
                   role="alert"
@@ -447,7 +434,6 @@ export function NewProjectModal({
                   <span>{nameError}</span>
                 </div>
               ) : null}
-              {conflict ? <ConflictingProject name={conflictName} /> : null}
               {availability.checking ? (
                 <p role="status" className="font-display text-body-sm text-mist">
                   {PROJECT_MODAL_ROW.availabilityChecking}

@@ -284,23 +284,22 @@ describe("new project modal", () => {
     expect(screen.getByRole("button", { name: "Done" })).toBeTruthy();
   });
 
-  it("surfaces the conflict preview for a supplied duplicate name", () => {
+  it("flags the input with a red danger box for a supplied duplicate name", () => {
     renderModal({ existingNames: ["blog-engine", "shopflow-store"] });
-    expect(screen.queryByText(PROJECT_MODAL_ROW.conflictHeading)).toBeNull();
+    expect(screen.queryByText(PROJECT_MODAL_ROW.conflictMessage)).toBeNull();
     fireEvent.change(screen.getByLabelText(/Project name/), {
       target: { value: "blog-engine" },
     });
-    expect(screen.getByText(PROJECT_MODAL_ROW.conflictHeading)).toBeTruthy();
-    expect(screen.getByText(PROJECT_MODAL_ROW.conflictCode)).toBeTruthy();
     expect(screen.getByText(PROJECT_MODAL_ROW.conflictMessage)).toBeTruthy();
+    expect(screen.getByRole("alert")).toBeTruthy();
+    expect(screen.queryByText("HTTP 409")).toBeNull();
     const nameInput = screen.getByLabelText(/Project name/);
     expect(nameInput.getAttribute("aria-invalid")).toBe("true");
     expect(nameInput.getAttribute("aria-describedby")).toBe("project-name-conflict");
-    expect(screen.getByLabelText(PROJECT_MODAL_ROW.conflictCodeLabel)).toBeTruthy();
     fireEvent.change(screen.getByLabelText(/Project name/), {
       target: { value: "waveform-api" },
     });
-    expect(screen.queryByText(PROJECT_MODAL_ROW.conflictHeading)).toBeNull();
+    expect(screen.queryByText(PROJECT_MODAL_ROW.conflictMessage)).toBeNull();
   });
 
   it("spins through the environment tiers and fires the create seam", async () => {
@@ -445,7 +444,7 @@ describe("new project modal", () => {
     const harness = createHarness();
     renderModal({ existingNames: [], catalogComplete: false }, harness);
     fillName("remote-taken-name");
-    expect(screen.getByText(PROJECT_MODAL_ROW.conflictHeading)).toBeTruthy();
+    expect(screen.getByText(PROJECT_MODAL_ROW.conflictMessage)).toBeTruthy();
     expect(
       (screen.getByRole("button", { name: "Link to repo" }) as HTMLButtonElement).disabled,
     ).toBe(true);
@@ -470,7 +469,7 @@ describe("new project modal", () => {
   it("keeps local checking instant and skips the hint on a complete catalog", () => {
     renderModal({ existingNames: ["blog-engine"], catalogComplete: true });
     fillName("blog-engine");
-    expect(screen.getByText(PROJECT_MODAL_ROW.conflictHeading)).toBeTruthy();
+    expect(screen.getByText(PROJECT_MODAL_ROW.conflictMessage)).toBeTruthy();
     expect(screen.queryByRole("status")).toBeNull();
   });
 });

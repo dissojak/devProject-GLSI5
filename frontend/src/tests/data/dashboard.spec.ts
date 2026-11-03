@@ -132,8 +132,6 @@ describe("dashboard data rows", () => {
       title: "New project",
       nameLabel: "Project name",
       slugHint: "Slug compatible",
-      conflictHeading: "Conflict Check Preview",
-      conflictCode: "HTTP 409",
       conflictMessage: "A project with this name already exists.",
       environmentLabel: "Environment",
       environmentHint: "Primary deployment tier configured at creation.",
