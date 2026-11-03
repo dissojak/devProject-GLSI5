@@ -8,6 +8,7 @@ import type {
   CreateProjectInput,
   UpdateProjectInput,
   ListProjectsInput,
+  AvailabilityQuery,
 } from './project.schema.js';
 
 function isDuplicateKeyError(error: unknown): boolean {
@@ -141,7 +142,19 @@ export function createProjectService(
     await project.softDelete();
   }
 
-  return { create, list, get, update, remove };
+  async function availability(
+    userId: string,
+    input: AvailabilityQuery,
+  ): Promise<{ exists: boolean }> {
+    const exists = await projects.existsForOwnerNameInsensitive(
+      new Types.ObjectId(userId),
+      input.name,
+    );
+
+    return { exists };
+  }
+
+  return { create, list, get, update, remove, availability };
 }
 
 /**

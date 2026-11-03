@@ -139,4 +139,42 @@ describe('Project service', () => {
       service.create(owner, { name: 'releasable' }),
     ).resolves.toMatchObject({ name: 'releasable' });
   });
+
+  it('availability reports exists=false for a free name', async () => {
+    const service = createProjectService();
+    const owner = new Types.ObjectId().toHexString();
+
+    const result = await service.availability(owner, { name: 'brand-new' });
+
+    expect(result).toEqual({ exists: false });
+  });
+
+  it('availability matches names case-insensitively', async () => {
+    const service = createProjectService();
+    const owner = new Types.ObjectId().toHexString();
+    await service.create(owner, { name: 'Dup-Name' });
+
+    expect(await service.availability(owner, { name: 'dup-name' })).toEqual({ exists: true });
+    expect(await service.availability(owner, { name: 'DUP-NAME' })).toEqual({ exists: true });
+    expect(await service.availability(owner, { name: 'Dup-Name' })).toEqual({ exists: true });
+  });
+
+  it('availability is owner-scoped: another workspace may reuse the name', async () => {
+    const service = createProjectService();
+    const owner = new Types.ObjectId().toHexString();
+    const stranger = new Types.ObjectId().toHexString();
+    await service.create(owner, { name: 'shared' });
+
+    expect(await service.availability(stranger, { name: 'shared' })).toEqual({ exists: false });
+  });
+
+  it('availability ignores soft-deleted projects', async () => {
+    const service = createProjectService();
+    const owner = new Types.ObjectId().toHexString();
+    const project = await service.create(owner, { name: 'gone' });
+
+    await service.remove(owner, project.id);
+
+    expect(await service.availability(owner, { name: 'gone' })).toEqual({ exists: false });
+  });
 });

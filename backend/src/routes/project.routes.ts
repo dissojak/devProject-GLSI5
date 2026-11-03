@@ -8,6 +8,7 @@ import {
   createGetProjectController,
   createUpdateProjectController,
   createDeleteProjectController,
+  createProjectAvailabilityController,
 } from '../controllers/project.controller.js';
 
 /**
@@ -21,6 +22,9 @@ export function createProjectRouter(
   const router = Router();
 
   router.post('/', requireAuth, createCreateProjectController(projectService));
+
+  // Literal path before '/:id' or it would be swallowed as an id.
+  router.get('/availability', requireAuth, createProjectAvailabilityController(projectService));
 
   router.get('/', requireAuth, createListProjectsController(projectService));
 

@@ -37,6 +37,11 @@ export const listProjectsSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 
+export const availabilityQuerySchema = z.object({
+  name: z.string().trim().min(1).max(120),
+});
+
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 export type ListProjectsInput = z.infer<typeof listProjectsSchema>;
+export type AvailabilityQuery = z.infer<typeof availabilityQuerySchema>;

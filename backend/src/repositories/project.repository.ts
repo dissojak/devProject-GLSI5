@@ -19,4 +19,24 @@ export class ProjectRepository extends BaseRepository<ProjectFields, ProjectMeth
   ): Promise<ProjectDocument | null> {
     return this.findOne({ _id: id, owner: ownerId }, options);
   }
+
+  /**
+   * Case-insensitive ownership probe for the name-availability feature
+   * (locale collation, strength 2) — stored casing stays untouched.
+   */
+  async existsForOwnerNameInsensitive(
+    ownerId: Types.ObjectId | string,
+    name: string,
+    options: RepositoryOptions = {},
+  ): Promise<boolean> {
+    const query = this.model
+      .findOne({ owner: ownerId, name })
+      .collation({ locale: 'en', strength: 2 })
+      .select({ _id: 1 })
+      .session(options.session ?? null);
+    if (options.withDeleted) {
+      query.setOptions({ withDeleted: true });
+    }
+    return (await query.exec()) !== null;
+  }
 }

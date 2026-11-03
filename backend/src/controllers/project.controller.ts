@@ -7,6 +7,7 @@ import {
   updateProjectSchema,
   listProjectsSchema,
   projectIdSchema,
+  availabilityQuerySchema,
 } from '../services/project/project.schema.js';
 
 // `res.locals.userId` is set by the requireAuth guard on the route line.
@@ -21,6 +22,27 @@ export function createCreateProjectController(
     res.status(201).json({
       message: 'Project created successfully',
       data: project,
+    });
+  };
+}
+
+// GET /projects/availability - case-insensitive ownership probe used by the
+// create-project flow to pre-check name collisions across the whole
+// workspace. Soft-deleted projects are excluded like every other query.
+export function createProjectAvailabilityController(
+  projectService: ProjectService,
+): RequestHandler {
+  return async (req, res) => {
+    const input = parseOrThrow(
+      availabilityQuerySchema,
+      req.query,
+      'Invalid availability query',
+    );
+    const { exists } = await projectService.availability(res.locals.userId, input);
+
+    res.status(200).json({
+      message: 'Project name availability checked',
+      data: { name: input.name, exists },
     });
   };
 }
