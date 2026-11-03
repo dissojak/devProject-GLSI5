@@ -3,8 +3,13 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { cn } from "@/utils/class-names";
-import { CARD_ACTION_ROW, ENVIRONMENT_LABELS } from "@/data/dashboard";
+import {
+  CARD_ACTION_ROW,
+  ENVIRONMENT_LABELS,
+} from "@/data/dashboard";
+import { REPOSITORY_FEEDBACK } from "@/data/dashboard-form";
 import type { EnvironmentTone, ProjectRow } from "@/types/dashboard";
+import { repositorySummaryOf, repositoryUrlOf } from "@/utils/project-view";
 import { MaterialIcon } from "@/shared/material-icon";
 
 const CARD_VARIANTS = {
@@ -20,10 +25,18 @@ const ENV_CHIP_CLASSES: Record<EnvironmentTone, string> = {
 
 function CardMenu({
   open,
-  onClose,
+  pending,
+  repositoryLinked,
+  onEdit,
+  onDelete,
+  onConnect,
 }: {
   open: boolean;
-  onClose: () => void;
+  pending: boolean;
+  repositoryLinked: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+  onConnect: () => void;
 }) {
   return (
     <AnimatePresence>
@@ -33,11 +46,11 @@ function CardMenu({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}
           transition={{ type: "spring", stiffness: 500, damping: 30 }}
-          className="absolute right-0 top-8 z-30 flex w-36 flex-col gap-0.5 rounded-xl bg-abyss p-1.5 shadow-2xl"
+          className="absolute right-0 top-8 z-30 flex w-44 flex-col gap-0.5 rounded-xl bg-abyss p-1.5 shadow-2xl"
         >
           <button
             type="button"
-            onClick={onClose}
+            onClick={onEdit}
             className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left font-display text-body-sm text-frost transition-colors hover:bg-surface-mid"
           >
             <MaterialIcon name="edit" className="text-[16px]" />
@@ -45,7 +58,21 @@ function CardMenu({
           </button>
           <button
             type="button"
-            onClick={onClose}
+            onClick={onConnect}
+            disabled={pending}
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left font-display text-body-sm text-frost transition-colors hover:bg-surface-mid"
+          >
+            <MaterialIcon name="link" className="text-[16px]" />
+            <span>
+              {repositoryLinked
+                ? CARD_ACTION_ROW.updateLabel
+                : CARD_ACTION_ROW.connectLabel}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={pending}
             className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left font-display text-body-sm text-rose transition-colors hover:bg-ember/20"
           >
             <MaterialIcon name="delete" className="text-[16px]" />
@@ -57,8 +84,22 @@ function CardMenu({
   );
 }
 
-export function ProjectCard({ row }: { row: ProjectRow }) {
+export function ProjectCard({
+  row,
+  menuPending = false,
+  onEdit,
+  onDelete,
+  onConnect,
+}: {
+  row: ProjectRow;
+  menuPending?: boolean;
+  onEdit: (row: ProjectRow) => void;
+  onDelete: (row: ProjectRow) => void;
+  onConnect: (row: ProjectRow) => void;
+}) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const closeMenu = () => setMenuOpen(false);
+  const repository = row.repository;
 
   return (
     <motion.div
@@ -94,16 +135,58 @@ export function ProjectCard({ row }: { row: ProjectRow }) {
             >
               <MaterialIcon name="more_vert" className="text-[18px]" />
             </button>
-            <CardMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
+            <CardMenu
+              open={menuOpen}
+              pending={menuPending}
+              repositoryLinked={repository !== null}
+              onEdit={() => {
+                closeMenu();
+                onEdit(row);
+              }}
+              onDelete={() => {
+                closeMenu();
+                onDelete(row);
+              }}
+              onConnect={() => {
+                closeMenu();
+                onConnect(row);
+              }}
+            />
           </div>
         </div>
         <p className="mt-3 font-display text-body-md text-smoke line-clamp-2">
           {row.description}
         </p>
       </div>
-      <div className="mt-6 flex items-center gap-2 font-mono text-label-md text-smoke">
-        <MaterialIcon name="calendar_today" className="text-[15px]" />
-        <span>{row.createdAt}</span>
+      <div className="mt-6 flex items-center justify-between gap-3 font-mono text-label-md text-smoke">
+        <span className="flex items-center gap-2">
+          <MaterialIcon name="calendar_today" className="text-[15px]" />
+          <span>{row.createdAt}</span>
+        </span>
+        {repository ? (
+          <a
+            href={repositoryUrlOf(repository)}
+            target="_blank"
+            rel="noreferrer"
+            title={CARD_ACTION_ROW.repositoryOpenLabel}
+            aria-label={`${repositorySummaryOf(repository)} — ${
+              repository.isValid
+                ? REPOSITORY_FEEDBACK.verifiedLabel
+                : REPOSITORY_FEEDBACK.invalidLabel
+            } — ${repository.branch} — ${CARD_ACTION_ROW.repositoryOpenLabel}`}
+            className="flex min-w-0 items-center gap-1.5 font-mono text-label-md text-mist transition-colors hover:text-ice"
+          >
+            <MaterialIcon
+              name={repository.isValid ? "verified" : "error"}
+              className={cn(
+                "shrink-0 text-[15px]",
+                repository.isValid ? "text-mint" : "text-crimson",
+              )}
+            />
+            <span className="truncate">{repositorySummaryOf(repository)}</span>
+            <span className="shrink-0 text-cinder">· {repository.branch}</span>
+          </a>
+        ) : null}
       </div>
     </motion.div>
   );

@@ -13,6 +13,7 @@ import type {
 } from "@/types/dashboard";
 
 interface DashboardProjectsToolbarProps {
+  countLabel: string;
   filter: DashboardFilterId;
   onFilter: (filter: DashboardFilterId) => void;
   viewMode: DashboardViewMode;
@@ -69,6 +70,7 @@ function ViewToggleChip({
 }
 
 export function ProjectsToolbar({
+  countLabel,
   filter,
   onFilter,
   viewMode,
@@ -82,7 +84,7 @@ export function ProjectsToolbar({
             {PROJECTS_HEADING_ROW.heading}
           </h2>
           <span className="rounded-full bg-surface-highest px-2.5 py-0.5 font-mono text-label-sm text-smoke">
-            {PROJECTS_HEADING_ROW.countLabel}
+            {countLabel}
           </span>
         </div>
         <div className="flex items-center gap-4">

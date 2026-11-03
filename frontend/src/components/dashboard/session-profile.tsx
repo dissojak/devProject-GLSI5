@@ -1,13 +1,29 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuthSession } from "@/hooks/use-auth-session";
+import { useAccountLogout } from "@/hooks/use-auth-request";
+import { useSessionClear } from "@/hooks/use-auth-session";
 import { LOGOUT_ROUTE } from "@/data/dashboard";
 import { initials, titleCase } from "@/utils/identity";
 import { MaterialIcon } from "@/shared/material-icon";
 
 export function DashboardProfileCard() {
-  const { user } = useAuthSession();
+  const { user, token } = useAuthSession();
+  const { pending, logout } = useAccountLogout();
+  const clearSession = useSessionClear();
+  const router = useRouter();
+
+  async function handleLogout() {
+    if (!token) return;
+    try {
+      await logout(token);
+    } finally {
+      clearSession();
+      router.replace(LOGOUT_ROUTE.href);
+    }
+  }
+
   if (!user) {
     return null;
   }
@@ -26,14 +42,16 @@ export function DashboardProfileCard() {
           </span>
         </div>
       </div>
-      <Link
-        href={LOGOUT_ROUTE.href}
+      <button
+        type="button"
+        onClick={handleLogout}
         aria-label={LOGOUT_ROUTE.label}
         title={LOGOUT_ROUTE.label}
-        className="shrink-0 rounded p-1.5 text-smoke transition-colors hover:bg-surface-high hover:text-rose"
+        disabled={pending}
+        className="shrink-0 rounded p-1.5 text-smoke transition-colors enabled:hover:bg-surface-high enabled:hover:text-rose"
       >
         <MaterialIcon name="logout" className="text-[20px]" />
-      </Link>
+      </button>
     </div>
   );
 }

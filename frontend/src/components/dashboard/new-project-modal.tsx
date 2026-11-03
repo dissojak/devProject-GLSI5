@@ -1,25 +1,52 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { cn } from "@/utils/class-names";
 import { ENVIRONMENT_LABELS } from "@/data/dashboard";
 import {
+  CONNECT_REPOSITORY_MODAL_ROW,
+  EDIT_PROJECT_MODAL_ROW,
   ENVIRONMENT_OPTION_ROWS,
+  PROJECT_FORM_FEEDBACK,
   PROJECT_MODAL_ROW,
+  PROJECT_NAME_LIMITS,
 } from "@/data/dashboard-form";
-import type { EnvironmentTone } from "@/types/dashboard";
+import type {
+  EnvironmentTone,
+  ProjectModalSubmitResult,
+  ProjectModalValues,
+} from "@/types/dashboard";
+import type { ConnectRepositoryBody } from "@/types/project";
+import {
+  repositoryFieldErrorsOf,
+  type RepositoryFieldError,
+} from "@/utils/repository";
+import { isTakenName, takenNameKeysOf } from "@/utils/names";
+import { useNameAvailability } from "@/hooks/use-name-availability";
 import { MaterialIcon } from "@/shared/material-icon";
+import { AlertBanner } from "@/shared/alert-banner";
 import { Button } from "@/shared/button";
+import { RepositoryFields } from "@/components/dashboard/repository-fields";
+
+type ModalMode = "create" | "edit";
+type WizardStep = "details" | "repository";
+type CreatedOutcome = { kind: "partial" | "unverifiable"; message?: string };
+
+export type { ModalMode };
 
 interface NewProjectModalProps {
+  mode: ModalMode;
   onClose: () => void;
   existingNames: string[];
-  onComplete?: (values: {
-    name: string;
-    description: string;
-    environment: EnvironmentTone;
-  }) => void;
+  /** True when the pulled catalog already accounts for every project (skip remote probe). */
+  catalogComplete: boolean;
+  pending: boolean;
+  initialValues?: ProjectModalValues;
+  onSubmit: (
+    values: ProjectModalValues,
+    repository: ConnectRepositoryBody | null,
+  ) => ProjectModalSubmitResult | Promise<ProjectModalSubmitResult>;
 }
 
 const ENV_SELECTION_BASE =
@@ -111,22 +138,186 @@ function EnvironmentMenu({
   );
 }
 
-export function NewProjectModal({ onClose, existingNames, onComplete }: NewProjectModalProps) {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [environment, setEnvironment] = useState<EnvironmentTone>("development");
+export function NewProjectModal({
+  mode,
+  onClose,
+  existingNames,
+  catalogComplete,
+  pending,
+  initialValues,
+  onSubmit,
+}: NewProjectModalProps) {
+  const row = mode === "edit" ? EDIT_PROJECT_MODAL_ROW : PROJECT_MODAL_ROW;
+  const [step, setStep] = useState<WizardStep>("details");
+  const [name, setName] = useState(initialValues?.name ?? "");
+  const [description, setDescription] = useState(initialValues?.description ?? "");
+  const [environment, setEnvironment] = useState<EnvironmentTone>(
+    initialValues?.environment ?? "development",
+  );
   const [envMenuOpen, setEnvMenuOpen] = useState(false);
-  const conflict = existingNames.some((existing) => existing === name.trim().toLowerCase());
+  const [validationErrors, setValidationErrors] = useState<Record<string, string[]>>({});
+  const [serverConflict, setServerConflict] = useState<string | null>(null);
+  const [serverFailure, setServerFailure] = useState<string | null>(null);
+  const [repositoryUrl, setRepositoryUrl] = useState("");
+  const [repositoryBranch, setRepositoryBranch] = useState("main");
+  const [repositoryFieldErrors, setRepositoryFieldErrors] = useState<
+    Partial<Record<"url" | "branch", RepositoryFieldError>>
+  >({});
+  const [serverRepositoryErrors, setServerRepositoryErrors] = useState<
+    Partial<Record<"url" | "branch", string>>
+  >({});
+  const [createdOutcome, setCreatedOutcome] = useState<CreatedOutcome | null>(null);
+
+  const activeStep: WizardStep = mode === "create" ? step : "details";
+  const onDetails = activeStep === "details";
+
+  const takenNames = useMemo(() => takenNameKeysOf(existingNames), [existingNames]);
+  const trimmedName = name.trim();
+  const knownConflict = isTakenName(takenNames, trimmedName);
+  const availability = useNameAvailability({
+    name,
+    taken: takenNames,
+    catalogComplete,
+    enabled: mode === "create",
+  });
+  const conflict = knownConflict || serverConflict !== null || availability.exists;
+  const conflictName = serverConflict ?? trimmedName;
+  const nameError =
+    validationErrors.name?.[0] ??
+    (conflict ? PROJECT_MODAL_ROW.conflictMessage : undefined);
+  const descriptionError = validationErrors.description?.[0];
   const selectedOption = ENVIRONMENT_OPTION_ROWS.find(
-    (row) => row.id === environment,
+    (option) => option.id === environment,
   );
 
-  function Submit(event: FormEvent) {
-    event.preventDefault();
-    if (!conflict) {
-      onComplete?.({ name: name.trim(), description, environment });
+  async function handleResult(result: ProjectModalSubmitResult, trimmed: string) {
+    if (result.kind === "success") {
+      onClose();
+      return;
+    }
+    if (result.kind === "conflict") {
+      setServerConflict(trimmed);
+      setStep("details");
+      return;
+    }
+    if (result.kind === "invalid") {
+      const fieldErrors = result.fieldErrors ?? {};
+      if (Object.keys(fieldErrors).length > 0) {
+        setValidationErrors(fieldErrors);
+      } else {
+        setServerFailure(result.message ?? PROJECT_FORM_FEEDBACK.failedMessage);
+      }
+      setStep("details");
+      return;
+    }
+    if (result.kind === "failed") {
+      setServerFailure(
+        result.message ??
+          `${PROJECT_FORM_FEEDBACK.failedHeading}: ${PROJECT_FORM_FEEDBACK.failedMessage}`,
+      );
+      return;
+    }
+    if (result.kind === "unverifiable" || result.kind === "partial") {
+      setCreatedOutcome({ kind: result.kind, message: result.message });
     }
   }
+
+  async function submitDetails(repository: ConnectRepositoryBody | null) {
+    if (pending) return;
+    const errors = validateValues(name, description);
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      if (!onDetails) {
+        setStep("details");
+      }
+      return;
+    }
+    setValidationErrors({});
+    if (conflict) {
+      setStep("details");
+      return;
+    }
+    setServerFailure(null);
+    setServerConflict(null);
+    const result = await onSubmit(
+      {
+        name: trimmedName,
+        description,
+        environment,
+      },
+      mode === "create" ? repository : null,
+    );
+    await handleResult(result, trimmedName);
+  }
+
+  async function handleContinue() {
+    if (pending) return;
+    const errors = validateValues(name, description);
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      return;
+    }
+    setValidationErrors({});
+    if (conflict) return;
+    setStep("repository");
+  }
+
+  async function handleDetailsSubmit(event: FormEvent) {
+    event.preventDefault();
+    if (mode === "edit") {
+      await submitDetails(null);
+      return;
+    }
+    await handleContinue();
+  }
+
+  async function handleFinalSubmit(event: FormEvent) {
+    event.preventDefault();
+    if (pending) return;
+    const errors = repositoryFieldErrorsOf(repositoryUrl, repositoryBranch);
+    if (Object.keys(errors).length > 0) {
+      setRepositoryFieldErrors(errors);
+      setServerRepositoryErrors({});
+      return;
+    }
+    setRepositoryFieldErrors({});
+    setServerRepositoryErrors({});
+    await submitDetails({
+      url: repositoryUrl.trim(),
+      branch: repositoryBranch.trim(),
+    });
+  }
+
+  const createdOutcomeHeading =
+    createdOutcome?.kind === "unverifiable"
+      ? PROJECT_MODAL_ROW.createdUnverifiedHeading
+      : PROJECT_MODAL_ROW.createdFailedHeading;
+  const createdOutcomeSuffix =
+    createdOutcome?.kind === "unverifiable"
+      ? PROJECT_MODAL_ROW.createdUnverifiedSuffix
+      : PROJECT_MODAL_ROW.createdFailedSuffix;
+  const createdOutcomeMessage =
+    createdOutcome?.message ??
+    (createdOutcome?.kind === "unverifiable"
+      ? CONNECT_REPOSITORY_MODAL_ROW.unverifiableFallback
+      : CONNECT_REPOSITORY_MODAL_ROW.githubFailedMessage);
+
+  const title =
+    mode === "edit"
+      ? row.title
+      : onDetails
+        ? row.title
+        : CONNECT_REPOSITORY_MODAL_ROW.titleConnect;
+  const headerIcon = onDetails ? "rocket_launch" : "fork_right";
+
+  const banner = serverFailure ? (
+    <AlertBanner
+      tone="crimson"
+      icon={<MaterialIcon name="warning" className="shrink-0 text-[16px]" />}
+    >
+      {serverFailure}
+    </AlertBanner>
+  ) : null;
 
   return (
     <motion.div
@@ -134,13 +325,15 @@ export function NewProjectModal({ onClose, existingNames, onComplete }: NewProje
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
-      onClick={onClose}
+      onClick={() => {
+        if (!pending) onClose();
+      }}
       className="fixed inset-0 left-[260px] top-[72px] z-30 flex items-center justify-center overflow-y-auto bg-basin/75 p-4 backdrop-blur-sm"
     >
       <motion.div
         role="dialog"
         aria-modal="true"
-        aria-label={PROJECT_MODAL_ROW.title}
+        aria-label={title}
         initial={{ opacity: 0, scale: 0.95, y: 15 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 15 }}
@@ -155,133 +348,303 @@ export function NewProjectModal({ onClose, existingNames, onComplete }: NewProje
         <div className="flex items-center justify-between border-b border-steel/40 pb-5">
           <div className="flex items-center gap-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-basin border border-steel">
-              <MaterialIcon name="rocket_launch" className="text-[19px] text-ice" />
+              <MaterialIcon name={headerIcon} className="text-[19px] text-ice" />
             </div>
-            <h2 className="font-display text-headline-md font-bold text-foam">
-              {PROJECT_MODAL_ROW.title}
-            </h2>
+            <h2 className="font-display text-headline-md font-bold text-foam">{title}</h2>
+            {mode === "create" ? (
+              <span className="flex items-center gap-1.5">
+                <span
+                  aria-hidden="true"
+                  className={cn("h-1.5 w-1.5 rounded-full", onDetails ? "bg-ice" : "bg-steel")}
+                />
+                <span
+                  aria-hidden="true"
+                  className={cn("h-1.5 w-1.5 rounded-full", onDetails ? "bg-steel" : "bg-ice")}
+                />
+                <span className="sr-only">
+                  {onDetails ? PROJECT_MODAL_ROW.stepDetails : PROJECT_MODAL_ROW.stepRepository}
+                </span>
+              </span>
+            ) : null}
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label={PROJECT_MODAL_ROW.closeLabel}
-            title={PROJECT_MODAL_ROW.closeLabel}
+            aria-label={row.closeLabel}
+            title={row.closeLabel}
+            disabled={pending}
             className="flex h-9 w-9 items-center justify-center rounded-full text-mist transition-colors hover:bg-basin/60 hover:text-foam"
           >
             <MaterialIcon name="close" className="text-[20px]" />
           </button>
         </div>
-        <form className="flex flex-col gap-5 pt-6" onSubmit={Submit}>
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
+        {createdOutcome ? (
+          <div className="flex flex-col gap-5 pt-6">
+            <AlertBanner
+              tone="champagne"
+              icon={<MaterialIcon name="warning" className="shrink-0 text-[16px]" />}
+            >
+              <span className="flex flex-col gap-1">
+                <span className="font-semibold">{createdOutcomeHeading}</span>
+                <span>{createdOutcomeMessage}</span>
+                <span>{createdOutcomeSuffix}</span>
+              </span>
+            </AlertBanner>
+            <div className="mt-1 flex items-center justify-end border-t border-steel/50 pt-4">
+              <Button onClick={onClose} className="h-10 gap-2 px-6 font-bold">
+                <span>{PROJECT_MODAL_ROW.doneLabel}</span>
+              </Button>
+            </div>
+          </div>
+        ) : onDetails ? (
+          <form className="flex flex-col gap-5 pt-6" onSubmit={handleDetailsSubmit}>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <label
+                  htmlFor="project-name-input"
+                  className="flex items-center gap-1 font-display text-body-md font-semibold text-foam"
+                >
+                  {row.nameLabel}
+                  <span className="font-mono text-crimson">{row.nameRequired}</span>
+                </label>
+                <span className="font-mono text-label-sm uppercase text-mist">
+                  {row.slugHint}
+                </span>
+              </div>
+              <div className="relative">
+                <input
+                  id="project-name-input"
+                  type="text"
+                  value={name}
+                  onChange={(event) => {
+                    setName(event.target.value);
+                    setServerConflict(null);
+                  }}
+                  placeholder={row.namePlaceholder}
+                  disabled={pending}
+                  aria-invalid={conflict || nameError !== undefined}
+                  aria-describedby={
+                    conflict
+                      ? "project-name-conflict"
+                      : nameError
+                        ? "project-name-error"
+                        : undefined
+                  }
+                  className={NAME_INPUT_BASE}
+                />
+                <MaterialIcon
+                  name="check_circle"
+                  className="absolute right-3.5 top-3 text-[18px] text-teal"
+                />
+              </div>
+              {nameError && !conflict ? (
+                <div
+                  id="project-name-error"
+                  role="alert"
+                  className="flex items-center gap-1.5 font-display text-body-sm text-crimson"
+                >
+                  <MaterialIcon name="error" className="shrink-0 text-[15px]" />
+                  <span>{nameError}</span>
+                </div>
+              ) : null}
+              {conflict ? <ConflictingProject name={conflictName} /> : null}
+              {availability.checking ? (
+                <p role="status" className="font-display text-body-sm text-mist">
+                  {PROJECT_MODAL_ROW.availabilityChecking}
+                </p>
+              ) : null}
+            </div>
+            <div className="flex flex-col gap-2">
               <label
-                htmlFor="project-name-input"
-                className="flex items-center gap-1 font-display text-body-md font-semibold text-foam"
+                htmlFor="project-description-input"
+                className="flex items-center gap-1.5 font-display text-body-md font-semibold text-foam"
               >
-                {PROJECT_MODAL_ROW.nameLabel}
-                <span className="font-mono text-crimson">
-                  {PROJECT_MODAL_ROW.nameRequired}
+                {row.descriptionLabel}
+                <span className="font-display text-body-sm font-normal text-mist">
+                  {row.descriptionHint}
                 </span>
               </label>
-              <span className="font-mono text-label-sm uppercase text-mist">
-                {PROJECT_MODAL_ROW.slugHint}
-              </span>
-            </div>
-            <div className="relative">
-              <input
-                id="project-name-input"
-                type="text"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder={PROJECT_MODAL_ROW.namePlaceholder}
-                aria-invalid={conflict}
-                aria-describedby={conflict ? "project-name-conflict" : undefined}
-                className={NAME_INPUT_BASE}
+              <textarea
+                id="project-description-input"
+                rows={3}
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                placeholder={row.descriptionPlaceholder}
+                disabled={pending}
+                aria-invalid={descriptionError !== undefined}
+                aria-describedby={descriptionError ? "project-description-error" : undefined}
+                className="w-full resize-none rounded-xl bg-basin p-3.5 font-display text-body-md text-foam outline-none transition-all placeholder:text-mist/50 focus:border-teal focus:ring-1 focus:ring-teal"
               />
-              <MaterialIcon
-                name="check_circle"
-                className="absolute right-3.5 top-3 text-[18px] text-teal"
-              />
+              {descriptionError ? (
+                <div
+                  id="project-description-error"
+                  role="alert"
+                  className="flex items-center gap-1.5 font-display text-body-sm text-crimson"
+                >
+                  <MaterialIcon name="error" className="shrink-0 text-[15px]" />
+                  <span>{descriptionError}</span>
+                </div>
+              ) : null}
             </div>
-            {conflict ? <ConflictingProject name={name.trim()} /> : null}
-          </div>
-          <div className="flex flex-col gap-2">
-            <label
-              htmlFor="project-description-input"
-              className="flex items-center gap-1.5 font-display text-body-md font-semibold text-foam"
-            >
-              {PROJECT_MODAL_ROW.descriptionLabel}
-              <span className="font-display text-body-sm font-normal text-mist">
-                {PROJECT_MODAL_ROW.descriptionHint}
-              </span>
-            </label>
-            <textarea
-              id="project-description-input"
-              rows={3}
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              placeholder={PROJECT_MODAL_ROW.descriptionPlaceholder}
-              className="w-full resize-none rounded-xl bg-basin p-3.5 font-display text-body-md text-foam outline-none transition-all placeholder:text-mist/50 focus:border-teal focus:ring-1 focus:ring-teal"
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <span
-              id="environment-label"
-              className="font-display text-body-md font-semibold text-foam"
-            >
-              {PROJECT_MODAL_ROW.environmentLabel}
-            </span>
-            <div className="relative" role="group" aria-labelledby="environment-label">
-              <button
-                type="button"
-                aria-expanded={envMenuOpen}
-                aria-haspopup="listbox"
-                aria-labelledby="environment-value environment-label"
-                onClick={() => setEnvMenuOpen((open) => !open)}
-                className={ENV_SELECTION_BASE}
-              >
-                <span id="environment-value" className="flex items-center gap-2.5">
-                  <span className={cn("h-2.5 w-2.5 rounded-full", selectedOption?.dotModerator)} />
-                  <span className="font-display text-body-md font-medium text-foam">
-                    {ENVIRONMENT_LABELS[environment]}
-                  </span>
+            {mode === "create" ? (
+              <div className="flex flex-col gap-2">
+                <span
+                  id="environment-label"
+                  className="font-display text-body-md font-semibold text-foam"
+                >
+                  {PROJECT_MODAL_ROW.environmentLabel}
                 </span>
-                <span className="flex items-center gap-2 text-cinder">
-                  <span className="font-mono text-label-sm uppercase opacity-75">
-                    {PROJECT_MODAL_ROW.environmentHint}
-                  </span>
-                  <motion.span
-                    animate={{ rotate: envMenuOpen ? 180 : 0 }}
-                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                <div className="relative" role="group" aria-labelledby="environment-label">
+                  <button
+                    type="button"
+                    aria-expanded={envMenuOpen}
+                    aria-haspopup="listbox"
+                    aria-labelledby="environment-value environment-label"
+                    disabled={pending}
+                    onClick={() => setEnvMenuOpen((open) => !open)}
+                    className={cn(ENV_SELECTION_BASE, pending && "opacity-60")}
                   >
-                    <MaterialIcon name="expand_more" className="text-[20px]" />
-                  </motion.span>
-                </span>
-              </button>
-              <EnvironmentMenu
-                open={envMenuOpen}
-                selected={environment}
-                onSelect={(tone) => {
-                  setEnvironment(tone);
-                  setEnvMenuOpen(false);
-                }}
-              />
+                    <span id="environment-value" className="flex items-center gap-2.5">
+                      <span className={cn("h-2.5 w-2.5 rounded-full", selectedOption?.dotModerator)} />
+                      <span className="font-display text-body-md font-medium text-foam">
+                        {ENVIRONMENT_LABELS[environment]}
+                      </span>
+                    </span>
+                    <span className="flex items-center gap-2 text-cinder">
+                      <span className="font-mono text-label-sm uppercase opacity-75">
+                        {PROJECT_MODAL_ROW.environmentHint}
+                      </span>
+                      <motion.span
+                        animate={{ rotate: envMenuOpen ? 180 : 0 }}
+                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                      >
+                        <MaterialIcon name="expand_more" className="text-[20px]" />
+                      </motion.span>
+                    </span>
+                  </button>
+                  <EnvironmentMenu
+                    open={envMenuOpen}
+                    selected={environment}
+                    onSelect={(tone) => {
+                      setEnvironment(tone);
+                      setEnvMenuOpen(false);
+                    }}
+                  />
+                </div>
+              </div>
+            ) : null}
+            {banner}
+            <div className="mt-1 flex items-center justify-end gap-3 border-t border-steel/50 pt-4">
+              <Button
+                variant="champagne"
+                onClick={onClose}
+                disabled={pending}
+                className="h-10 px-5"
+              >
+                {row.cancelLabel}
+              </Button>
+              {mode === "create" ? (
+                <>
+                  <Button
+                    variant="champagne"
+                    onClick={() => void submitDetails(null)}
+                    disabled={pending || availability.checking || conflict}
+                    className="h-10 px-5"
+                  >
+                    {PROJECT_MODAL_ROW.saveDraftLabel}
+                  </Button>
+                  <Button
+                    onClick={() => void handleContinue()}
+                    disabled={pending || availability.checking || conflict}
+                    className="h-10 gap-2 px-6 font-bold shadow-ice-submit hover:shadow-ice-halo"
+                  >
+                    <span>{PROJECT_MODAL_ROW.continueLabel}</span>
+                    <MaterialIcon name="arrow_forward" className="text-[18px]" />
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  type="submit"
+                  disabled={pending}
+                  className="h-10 gap-2 px-6 font-bold shadow-ice-submit hover:shadow-ice-halo"
+                >
+                  <MaterialIcon
+                    name={pending ? "progress_activity" : row.submitIcon}
+                    className={cn("text-[18px]", pending && "animate-spin")}
+                  />
+                  <span>{pending ? PROJECT_FORM_FEEDBACK.pendingLabel : row.submitLabel}</span>
+                </Button>
+              )}
             </div>
-          </div>
-          <div className="mt-1 flex items-center justify-end gap-3 border-t border-steel/50 pt-4">
-            <Button variant="champagne" onClick={onClose} className="h-10 px-5">
-              {PROJECT_MODAL_ROW.cancelLabel}
-            </Button>
-            <Button
-              type="submit"
-              className="h-10 gap-2 px-6 font-bold shadow-ice-submit hover:shadow-ice-halo"
-            >
-              <MaterialIcon name={PROJECT_MODAL_ROW.submitIcon} className="text-[18px]" />
-              <span>{PROJECT_MODAL_ROW.submitLabel}</span>
-            </Button>
-          </div>
-        </form>
+          </form>
+        ) : (
+          <form className="flex flex-col gap-5 pt-6" onSubmit={handleFinalSubmit}>
+            <p className="font-display text-body-md text-smoke">
+              {CONNECT_REPOSITORY_MODAL_ROW.copy}
+            </p>
+            <RepositoryFields
+              url={repositoryUrl}
+              branch={repositoryBranch}
+              urlError={repositoryFieldErrors.url}
+              branchError={repositoryFieldErrors.branch}
+              serverUrlError={serverRepositoryErrors.url}
+              serverBranchError={serverRepositoryErrors.branch}
+              disabled={pending}
+              onUrlChange={(value) => {
+                setRepositoryUrl(value);
+                setServerRepositoryErrors({});
+              }}
+              onBranchChange={(value) => {
+                setRepositoryBranch(value);
+                setServerRepositoryErrors({});
+              }}
+            />
+            {banner}
+            <div className="mt-1 flex items-center justify-between gap-3 border-t border-steel/50 pt-4">
+              <Button
+                variant="champagne"
+                onClick={() => setStep("details")}
+                disabled={pending}
+                className="h-10 gap-2 px-4"
+              >
+                <MaterialIcon name="arrow_back" className="text-[18px]" />
+                <span>{PROJECT_MODAL_ROW.backLabel}</span>
+              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="submit"
+                  disabled={pending || availability.checking}
+                  className="h-10 gap-2 px-6 font-bold shadow-ice-submit hover:shadow-ice-halo"
+                >
+                  <MaterialIcon
+                    name={pending ? "progress_activity" : PROJECT_MODAL_ROW.submitIcon}
+                    className={cn("text-[18px]", pending && "animate-spin")}
+                  />
+                  <span>
+                    {pending
+                      ? PROJECT_FORM_FEEDBACK.pendingLabel
+                      : PROJECT_MODAL_ROW.createSubmitLabel}
+                  </span>
+                </Button>
+              </div>
+            </div>
+          </form>
+        )}
       </motion.div>
     </motion.div>
   );
+}
+
+function validateValues(name: string, description: string): Record<string, string[]> {
+  const errors: Record<string, string[]> = {};
+  const trimmed = name.trim();
+  if (trimmed.length < PROJECT_NAME_LIMITS.min) {
+    errors.name = [PROJECT_NAME_LIMITS.requiredMessage];
+  } else if (trimmed.length > PROJECT_NAME_LIMITS.max) {
+    errors.name = [PROJECT_NAME_LIMITS.tooLongMessage];
+  }
+  if (description.length > PROJECT_NAME_LIMITS.descriptionMax) {
+    errors.description = [PROJECT_NAME_LIMITS.descriptionTooLongMessage];
+  }
+  return errors;
 }

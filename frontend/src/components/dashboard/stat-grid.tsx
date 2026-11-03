@@ -1,16 +1,18 @@
-import { PROJECT_STATS_ROWS } from "@/data/dashboard";
+import type { DashboardStatRow } from "@/types/dashboard";
 import { MaterialIcon } from "@/shared/material-icon";
 import { cn } from "@/utils/class-names";
-import type { DashboardStatRow, StatAccent } from "@/types/dashboard";
 
-const STAT_MARK_CLASSES: Record<StatAccent, string> = {
+const STAT_MARK_CLASSES: Record<
+  DashboardStatRow["accent"],
+  string
+> = {
   total: "text-ice-dim",
   development: "bg-glint shadow-tide-dot",
   staging: "bg-champagne-soft shadow-champagne-dot",
   production: "bg-champagne-bright shadow-gold-dot",
 };
 
-const STAT_SUFFIX_CLASSES: Record<StatAccent, string|null> = {
+const STAT_SUFFIX_CLASSES: Record<DashboardStatRow["accent"], string | null> = {
   total: null,
   development: "text-tide",
   staging: "text-champagne-bright",
@@ -21,17 +23,22 @@ function StatMark({ row }: { row: DashboardStatRow }) {
   if (row.icon) {
     return (
       <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-abyss">
-        <MaterialIcon name={row.icon} className={cn("text-[18px]", STAT_MARK_CLASSES[row.accent])} />
+        <MaterialIcon
+          name={row.icon}
+          className={cn("text-[18px]", STAT_MARK_CLASSES[row.accent])}
+        />
       </div>
     );
   }
-  return <span className={cn("h-2.5 w-2.5 rounded-full", STAT_MARK_CLASSES[row.accent])} />;
+  return (
+    <span className={cn("h-2.5 w-2.5 rounded-full", STAT_MARK_CLASSES[row.accent])} />
+  );
 }
 
-export function StatGrid() {
+export function StatGrid({ rows }: { rows: DashboardStatRow[] }) {
   return (
     <div className="grid grid-cols-4 gap-5">
-      {PROJECT_STATS_ROWS.map((row) => {
+      {rows.map((row) => {
         const suffixClass = STAT_SUFFIX_CLASSES[row.accent];
         return (
           <div

@@ -4,13 +4,14 @@ import type {
   DashboardBrandRow,
   DashboardHeadingRow,
   DashboardNavRow,
+  DashboardStateKind,
+  DashboardStateRow,
   DashboardStatRow,
   EmptyStatVisualRow,
   EnvironmentFilterRow,
   EnvironmentTone,
   GreetingRow,
   PaginationRow,
-  ProjectRow,
   SearchRow,
   TelemetryRow,
   UserBadgeRow,
@@ -73,7 +74,7 @@ export const PROJECT_STATS_ROWS: DashboardStatRow[] = [
   {
     id: "total",
     label: "Total projects",
-    value: "12",
+    value: "0",
     suffix: "",
     accent: "total",
     icon: "folder",
@@ -82,7 +83,7 @@ export const PROJECT_STATS_ROWS: DashboardStatRow[] = [
   {
     id: "development",
     label: "Development",
-    value: "6",
+    value: "0",
     suffix: "ACTIVE",
     accent: "development",
     icon: null,
@@ -91,7 +92,7 @@ export const PROJECT_STATS_ROWS: DashboardStatRow[] = [
   {
     id: "staging",
     label: "Staging",
-    value: "4",
+    value: "0",
     suffix: "STANDBY",
     accent: "staging",
     icon: null,
@@ -100,7 +101,7 @@ export const PROJECT_STATS_ROWS: DashboardStatRow[] = [
   {
     id: "production",
     label: "Production",
-    value: "2",
+    value: "0",
     suffix: "LIVE",
     accent: "production",
     icon: null,
@@ -110,7 +111,6 @@ export const PROJECT_STATS_ROWS: DashboardStatRow[] = [
 
 export const PROJECTS_HEADING_ROW: DashboardHeadingRow = {
   heading: "Your projects",
-  countLabel: "12 projects",
 };
 
 export const ENVIRONMENT_FILTER_ROWS: EnvironmentFilterRow[] = [
@@ -125,14 +125,9 @@ export const VIEW_TOGGLE_ROWS: ViewToggleRow[] = [
   { id: "list", label: "List view", icon: "view_list" },
 ];
 
-export const PROJECT_ROWS: ProjectRow[] = [];
-
 export const PROJECT_PAGINATION_ROW: PaginationRow = {
-  pages: [1, 2, 3],
-  current: 1,
   previousLabel: "Previous",
   nextLabel: "Next",
-  statusLabel: "Page 1 of 3",
 };
 
 export const EMPTY_STAT_ROWS: DashboardStatRow[] = [
@@ -182,6 +177,22 @@ export const EMPTY_STATE_ROW: EmptyStatVisualRow = {
   actionLabel: "New project",
 };
 
+export const DASHBOARD_STATE_ROWS: Record<DashboardStateKind, DashboardStateRow> = {
+  loading: {
+    icon: "radar",
+    iconSpin: true,
+    heading: "Reading your workspace",
+    copy: "Pulling the latest projects from the planner core.",
+    actionLabel: null,
+  },
+  error: {
+    icon: "warning",
+    heading: "Planner core unreachable",
+    copy: "We could not load your projects. Check your connection and try again.",
+    actionLabel: "Retry",
+  },
+};
+
 export const EMPTY_TELEMETRY_ROWS: TelemetryRow[] = [
   {
     id: "blueprint",
@@ -207,6 +218,9 @@ export const CARD_ACTION_ROW = {
   menuLabel: "Project actions",
   editLabel: "Edit",
   deleteLabel: "Delete",
+  connectLabel: "Connect repository",
+  updateLabel: "Update repository",
+  repositoryOpenLabel: "Open on GitHub",
 } as const;
 
 export const ENVIRONMENT_LABELS: Record<EnvironmentTone, string> = {

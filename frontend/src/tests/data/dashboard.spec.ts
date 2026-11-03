@@ -10,6 +10,7 @@ import {
   DASHBOARD_NAV_ROWS,
   DASHBOARD_SEARCH_ROW,
   DASHBOARD_SOON_LABEL,
+  DASHBOARD_STATE_ROWS,
   EMPTY_STATE_ROW,
   EMPTY_STAT_ROWS,
   EMPTY_TELEMETRY_ROWS,
@@ -17,7 +18,6 @@ import {
   ENVIRONMENT_LABELS,
   LOGOUT_ROUTE,
   PROJECT_PAGINATION_ROW,
-  PROJECT_ROWS,
   PROJECT_STATS_ROWS,
   PROJECTS_HEADING_ROW,
   PROJECTS_ROUTE,
@@ -71,9 +71,9 @@ describe("dashboard data rows", () => {
     expect(DASHBOARD_GREETING_ROW.actionLabel).toBe("New project");
   });
 
-  it("carries the mockup telemetry metrics for the filled catalog", () => {
+  it("seeds telemetry values at zero until the planner core returns", () => {
     expect(PROJECT_STATS_ROWS).toHaveLength(4);
-    expect(PROJECT_STATS_ROWS.map((row) => row.value)).toEqual(["12", "6", "4", "2"]);
+    expect(PROJECT_STATS_ROWS.map((row) => row.value)).toEqual(["0", "0", "0", "0"]);
     expect(PROJECT_STATS_ROWS.map((row) => row.suffix)).toEqual(["", "ACTIVE", "STANDBY", "LIVE"]);
     expect(EMPTY_STAT_ROWS.map((row) => row.value)).toEqual(["0", "0", "0", "0"]);
     expect(EMPTY_STAT_ROWS.map((row) => row.suffix)).toEqual([
@@ -84,27 +84,30 @@ describe("dashboard data rows", () => {
     ]);
   });
 
-  it("starts with a real, empty project catalog", () => {
-    expect(PROJECT_ROWS).toEqual([]);
+  it("names the workspace loading and failure states from data rows", () => {
+    expect(DASHBOARD_STATE_ROWS.loading).toMatchObject({
+      icon: "radar",
+      heading: "Reading your workspace",
+      actionLabel: null,
+    });
+    expect(DASHBOARD_STATE_ROWS.error).toMatchObject({
+      icon: "warning",
+      heading: "Planner core unreachable",
+      actionLabel: "Retry",
+    });
   });
 
   it("documents the environment filter and heading copy", () => {
     const labels: DashboardFilterId[] = ["all", "development", "staging", "production"];
     expect(ENVIRONMENT_FILTER_ROWS.map((row) => row.id)).toEqual(labels);
     expect(ENVIRONMENT_FILTER_ROWS[0].label).toBe("All");
-    expect(PROJECTS_HEADING_ROW).toMatchObject({
-      heading: "Your projects",
-      countLabel: "12 projects",
-    });
+    expect(PROJECTS_HEADING_ROW).toEqual({ heading: "Your projects" });
   });
 
-  it("exposes the static pagination summary from the mockup", () => {
-    expect(PROJECT_PAGINATION_ROW).toMatchObject({
-      pages: [1, 2, 3],
-      current: 1,
+  it("exposes the pagination control labels from the mockup", () => {
+    expect(PROJECT_PAGINATION_ROW).toEqual({
       previousLabel: "Previous",
       nextLabel: "Next",
-      statusLabel: "Page 1 of 3",
     });
     expect(VIEW_TOGGLE_ROWS.map((row) => row.id)).toEqual(["grid", "list"]);
     expect(VIEW_TOGGLE_ROWS.map((row) => row.icon)).toEqual(["grid_view", "view_list"]);
@@ -133,7 +136,7 @@ describe("dashboard data rows", () => {
       conflictCode: "HTTP 409",
       conflictMessage: "A project with this name already exists.",
       environmentLabel: "Environment",
-      environmentHint: "active",
+      environmentHint: "Primary deployment tier configured at creation.",
       environmentMenuHeading: "Select Primary Tier",
       cancelLabel: "Cancel",
       submitLabel: "Create project",

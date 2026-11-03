@@ -1,4 +1,5 @@
 import type { MaterialIconName } from "@/types/icons";
+import type { RepositoryRef } from "@/types/project";
 
 export type EnvironmentTone = "development" | "staging" | "production";
 
@@ -75,7 +76,6 @@ export interface DashboardStatRow {
 
 export interface DashboardHeadingRow {
   heading: string;
-  countLabel: string;
 }
 
 export interface EnvironmentFilterRow {
@@ -89,14 +89,12 @@ export interface ProjectRow {
   description: string;
   environment: EnvironmentTone;
   createdAt: string;
+  repository: RepositoryRef | null;
 }
 
 export interface PaginationRow {
-  pages: number[];
-  current: number;
   previousLabel: string;
   nextLabel: string;
-  statusLabel: string;
 }
 
 export interface ViewToggleRow {
@@ -118,4 +116,59 @@ export interface TelemetryRow {
   label: string;
   icon: MaterialIconName;
   iconAccent: "frostMid" | "tide" | "champagneBright";
+}
+
+export type DashboardStateKind = "loading" | "error";
+
+export interface DashboardStateRow {
+  icon: MaterialIconName;
+  iconSpin?: boolean;
+  heading: string;
+  copy: string;
+  actionLabel: string | null;
+}
+
+export interface DashboardProjectError {
+  code: string;
+  message: string;
+}
+
+export interface ProjectTargetRow {
+  id: string;
+  name: string;
+}
+
+export type RepositorySubmitResultKind =
+  | "success"
+  | "unverifiable"
+  | "invalid"
+  | "failed";
+
+export interface RepositorySubmitResult {
+  kind: RepositorySubmitResultKind;
+  code?: string;
+  message?: string;
+  fieldErrors?: Record<string, string[]>;
+}
+
+export type ProjectModalSubmitResultKind =
+  | "success"
+  | "conflict"
+  | "invalid"
+  | "failed"
+  | "partial"
+  | "unverifiable";
+
+export interface ProjectModalSubmitResult {
+  kind: ProjectModalSubmitResultKind;
+  code?: string;
+  fieldErrors?: Record<string, string[]>;
+  message?: string;
+  projectId?: string;
+}
+
+export interface ProjectModalValues {
+  name: string;
+  description: string;
+  environment: EnvironmentTone;
 }
