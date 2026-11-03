@@ -4,6 +4,7 @@ import { BRAND } from "@/data/brand";
 import { FONT_VARIABLES } from "@/data/fonts";
 import { SiteBackground } from "@/components/layout/site-background";
 import { ReduxProvider } from "@/store/redux-provider";
+import { ToastProvider } from "@/components/toast/toast-provider";
 
 export const metadata: Metadata = {
   title: {
@@ -33,7 +34,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         className="relative flex min-h-full flex-col justify-between overflow-x-hidden bg-navy text-foam selection:bg-ice/30 selection:text-foam"
       >
         <SiteBackground />
-        <ReduxProvider>{children}</ReduxProvider>
+        <ReduxProvider>
+          <ToastProvider>{children}</ToastProvider>
+        </ReduxProvider>
       </body>
     </html>
   );

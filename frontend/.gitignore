@@ -43,3 +43,6 @@ next-env.d.ts
 
 # design mockups (local reference, not versioned)
 /UI/
+
+# Stitch reference (local design assets, not versioned)
+.stitch-ref/
