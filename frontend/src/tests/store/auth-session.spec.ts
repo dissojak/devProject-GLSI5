@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { authSessionSlice, sessionCleared, sessionRestored, sessionStarted, parseStoredSession } from "@/store/auth-session";
+import {
+  authSessionSlice,
+  sessionCleared,
+  sessionExpired,
+  sessionRestored,
+  sessionStarted,
+  parseStoredSession,
+} from "@/store/auth-session";
 import type { AuthAccount } from "@/types/auth";
 
 const ADA: AuthAccount = {
@@ -17,19 +24,20 @@ describe("authSession reducer", () => {
       token: null,
       user: null,
       hydrated: false,
+      expired: false,
     });
   });
 
   it("stores the token and user on sessionStarted", () => {
     expect(
       reducer(undefined, sessionStarted({ accessToken: "token-1", user: ADA })),
-    ).toEqual({ token: "token-1", user: ADA, hydrated: false });
+    ).toEqual({ token: "token-1", user: ADA, hydrated: false, expired: false });
   });
 
   it("clears everything on sessionCleared", () => {
     expect(
-      reducer({ token: "token-1", user: ADA, hydrated: true }, sessionCleared()),
-    ).toEqual({ token: null, user: null, hydrated: false });
+      reducer({ token: "token-1", user: ADA, hydrated: true, expired: false }, sessionCleared()),
+    ).toEqual({ token: null, user: null, hydrated: false, expired: false });
   });
 
   it("restores a persisted session and marks the store hydrated", () => {
@@ -37,6 +45,7 @@ describe("authSession reducer", () => {
       token: "token-2",
       user: ADA,
       hydrated: true,
+      expired: false,
     });
   });
 
@@ -45,13 +54,34 @@ describe("authSession reducer", () => {
       token: null,
       user: null,
       hydrated: true,
+      expired: false,
     });
+  });
+
+  it("drops the session and raises the expired flag on sessionExpired", () => {
+    const expiredState = reducer(
+      { token: "token-1", user: ADA, hydrated: true, expired: false },
+      sessionExpired(),
+    );
+    expect(expiredState).toEqual({
+      token: null,
+      user: null,
+      hydrated: true,
+      expired: true,
+    });
+  });
+
+  it("resets the expired flag on the next sign in", () => {
+    const expiredThenSignedIn = sessionStarted;
+    expect(
+      reducer({ token: null, user: null, hydrated: true, expired: true }, expiredThenSignedIn({ accessToken: "token-2", user: ADA })),
+    ).toEqual({ token: "token-2", user: ADA, hydrated: true, expired: false });
   });
 });
 
 describe("parseStoredSession", () => {
   it("returns an empty session for null storage", () => {
-    expect(parseStoredSession(null)).toEqual({ token: null, user: null, hydrated: false });
+    expect(parseStoredSession(null)).toEqual({ token: null, user: null, hydrated: false, expired: false });
   });
 
   it("returns an empty session for malformed JSON", () => {
@@ -59,6 +89,7 @@ describe("parseStoredSession", () => {
       token: null,
       user: null,
       hydrated: false,
+      expired: false,
     });
   });
 
@@ -67,11 +98,13 @@ describe("parseStoredSession", () => {
       token: null,
       user: null,
       hydrated: false,
+      expired: false,
     });
     expect(parseStoredSession('{"token":"t","user":{"id":"u1"}}')).toEqual({
       token: null,
       user: null,
       hydrated: false,
+      expired: false,
     });
   });
 

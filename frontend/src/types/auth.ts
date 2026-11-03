@@ -9,22 +9,6 @@ export interface AuthAccount {
 
 export type AuthGateStatus = "pending" | "granted" | "denied";
 
-export interface AuthTokens {
-  accessToken: string;
-  tokenType: string;
-  expiresIn: number;
-}
-
-/** Backend error codes surfaced by the auth endpoints (error-status-table.ts). */
-export type AuthErrorCode =
-  | "UNAUTHORIZED"
-  | "ACCOUNT_DISABLED"
-  | "FORBIDDEN"
-  | "CONFLICT"
-  | "VALIDATION_ERROR"
-  | "INTERNAL_ERROR"
-  | (string & Record<never, never>);
-
 export type AuthAlertTone = "crimson" | "orange" | "champagne";
 
 export type LoginAlertKind =
@@ -32,6 +16,7 @@ export type LoginAlertKind =
   | "account-deactivated"
   | "pending-approval"
   | "github-conflict"
+  | "session-expired"
   | "unexpected";
 
 export interface AuthAlertBanner {
@@ -51,19 +36,6 @@ export interface SignupSubmission {
   email: string;
   password: string;
 }
-
-export type LoginSubmitOutcome =
-  | { kind: "approved"; user: AuthAccount; accessToken: string }
-  | { kind: "failed"; alert: LoginAlertKind; code: string; message: string };
-
-export type SignupSubmitOutcome =
-  | { kind: "created"; user: AuthAccount }
-  | {
-      kind: "failed";
-      code: string;
-      message: string;
-      fieldErrors: SignupFieldErrors;
-    };
 
 export interface LoginFormValues {
   email: string;

@@ -29,6 +29,12 @@ export const AUTH_ALERTS: Record<LoginAlertKind, AuthAlertBanner> = {
     icon: "error",
     message: "A different GitHub account is already linked to this email.",
   },
+  "session-expired": {
+    id: "session-expired",
+    tone: "champagne",
+    icon: "lock_clock",
+    message: "Your session has expired. Log in again to continue.",
+  },
   unexpected: {
     id: "unexpected",
     tone: "crimson",

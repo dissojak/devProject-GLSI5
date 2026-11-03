@@ -8,7 +8,7 @@ import { AUTH_ALERTS } from "@/data/auth-alerts";
 import { GITHUB_REDIRECT_PARAM } from "@/data/auth-github";
 import { PROJECTS_ROUTE } from "@/data/dashboard";
 import { useAccountLogin } from "@/hooks/use-auth-request";
-import { useStartSession } from "@/hooks/use-auth-session";
+import { useAuthSession, useStartSession } from "@/hooks/use-auth-session";
 import { usePasswordVisibility } from "@/hooks/use-password-visibility";
 import { AlertBanner } from "@/shared/alert-banner";
 import { Button } from "@/shared/button";
@@ -53,9 +53,14 @@ export function LoginForm({ onSubmit }: LoginFormProps) {
   const router = useRouter();
   const { visible, toggle } = usePasswordVisibility();
 
-  // A redirected callback failure replaces (not stacks with) a submit alert.
+  const { expired } = useAuthSession();
+
+  // A redirected callback failure replaces (not stacks with) a submit alert;
+  // the expired-session banner shows only when nothing else is raised.
   const githubKind = githubCallbackAlert(useGithubCallbackCode());
-  const banner = githubKind ? AUTH_ALERTS[githubKind] : alert;
+  const banner = githubKind
+    ? AUTH_ALERTS[githubKind]
+    : (alert ?? (expired ? AUTH_ALERTS["session-expired"] : null));
 
   function handleChange(field: "email" | "password") {
     return (event: ChangeEvent<HTMLInputElement>) => {

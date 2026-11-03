@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Provider } from "react-redux";
 import { LoginForm } from "@/components/auth/login-form";
 import { appStore } from "@/store/store";
-import { sessionCleared } from "@/store/auth-session";
+import { sessionCleared, sessionExpired } from "@/store/auth-session";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn() }),
@@ -52,12 +52,12 @@ async function fillValidCredentialsAndSubmit() {
 
 describe("LoginForm", () => {
   it("renders the submit button only once as the primary button", () => {
-    render(<LoginForm />);
+    renderLoginForm();;
     expect(screen.getByRole("button", { name: /log in/i })).toBeDefined();
   });
 
   it("shows a field error when a field is missing", () => {
-    render(<LoginForm />);
+    renderLoginForm();;
     fireEvent.click(screen.getByRole("button", { name: /log in/i }));
     expect(screen.getByText("Email is required.")).toBeDefined();
     expect(screen.getByText("Password is required.")).toBeDefined();
@@ -65,7 +65,7 @@ describe("LoginForm", () => {
 
   it("invokes onSubmit with valid values", async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
-    render(<LoginForm onSubmit={onSubmit} />);
+    renderLoginForm({ onSubmit });;
 
     fireEvent.change(screen.getByPlaceholderText("you@example.com"), {
       target: { value: "ada@lovelace.dev" },
@@ -85,7 +85,7 @@ describe("LoginForm", () => {
 
   it("does not submit when validation fails", async () => {
     const onSubmit = vi.fn();
-    render(<LoginForm onSubmit={onSubmit} />);
+    renderLoginForm({ onSubmit });;
 
     fireEvent.change(screen.getByPlaceholderText("you@example.com"), {
       target: { value: "not-an-email" },
@@ -98,7 +98,7 @@ describe("LoginForm", () => {
   });
 
   it("toggles password visibility", () => {
-    render(<LoginForm />);
+    renderLoginForm();;
     const passwordInput = screen.getByPlaceholderText(
       "Enter your password",
     ) as HTMLInputElement;
@@ -187,6 +187,7 @@ describe("LoginForm against the backend", () => {
         token: "token-1",
         user: { id: "u1", name: "Ada Lovelace", email: "ada@example.com", role: "DEVELOPER" },
         hydrated: false,
+        expired: false,
       }),
     );
     expect(screen.queryByText("Something went wrong. Please try again.")).toBeNull();
@@ -203,6 +204,37 @@ describe("LoginForm against the backend", () => {
     });
     expect((EMAIL_INPUT() as HTMLInputElement).disabled).toBe(true);
     expect((PASSWORD_INPUT() as HTMLInputElement).disabled).toBe(true);
+  });
+});
+
+describe("LoginForm with an expired session", () => {
+  it("shows the session-expired banner after a 401 kicked the session out", () => {
+    appStore.dispatch(sessionExpired());
+    renderLoginForm();
+    expect(
+      screen.getByText("Your session has expired. Log in again to continue."),
+    ).toBeDefined();
+  });
+
+  it("hides the expired banner once a fresh sign-in completes", async () => {
+    stubAuthResponse(
+      {
+        message: "Login successful",
+        data: { id: "u1", name: "Ada Lovelace", email: "ada@example.com", role: "DEVELOPER" },
+        accessToken: "token-2",
+      },
+      true,
+    );
+    appStore.dispatch(sessionExpired());
+    renderLoginForm();
+    expect(
+      screen.getByText("Your session has expired. Log in again to continue."),
+    ).toBeDefined();
+    fillValidCredentialsAndSubmit();
+    await waitFor(() => expect(appStore.getState().authSession.token).toBe("token-2"));
+    expect(
+      screen.queryByText("Your session has expired. Log in again to continue."),
+    ).toBeNull();
   });
 });
 

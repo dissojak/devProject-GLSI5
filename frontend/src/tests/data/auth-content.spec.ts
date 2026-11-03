@@ -14,6 +14,7 @@ describe("auth alert banners", () => {
       "github-conflict",
       "invalid-credentials",
       "pending-approval",
+      "session-expired",
       "unexpected",
     ].sort());
   });

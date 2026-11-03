@@ -51,6 +51,7 @@ export type MaterialIconName =
   | "folder_open"
   | "create_new_folder"
   | "logout"
+  | "link"
   | "search"
   | "notifications"
   | "analytics"
@@ -65,4 +66,6 @@ export type MaterialIconName =
   | "how_to_reg"
   | "group"
   | "menu_book"
-  | "open_in_new";
+  | "open_in_new"
+  | "lock_clock"
+  | "refresh";
