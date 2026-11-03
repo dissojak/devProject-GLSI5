@@ -30,6 +30,11 @@ export interface RecommendationGeneratedBy {
   model: string;
 }
 
+export interface RecommendationProposedFile {
+  path: string;
+  content: string;
+}
+
 export interface RecommendationFields {
   analysis: Types.ObjectId;
   type: RecommendationType;
@@ -38,6 +43,8 @@ export interface RecommendationFields {
   title: string;
   description: string;
   suggestedValue?: string;
+  confidence?: number;
+  proposedFile?: RecommendationProposedFile;
   status: RecommendationStatus;
   decidedBy?: Types.ObjectId;
   decidedAt?: Date;
@@ -55,6 +62,8 @@ export interface RecommendationStatics {
     description: string;
     componentName?: string;
     suggestedValue?: string;
+    confidence?: number;
+    proposedFile?: RecommendationProposedFile;
   }): Promise<RecommendationDocument>;
 }
 
@@ -82,6 +91,7 @@ const RECOMMENDATION_MACHINE = defineStateMachine<RecommendationStatus>({
 
 const TITLE_MAX = 200;
 const DESCRIPTION_MAX = 2000;
+const PROPOSED_FILE_MAX = 20000;
 
 const recommendationSchema = new Schema<
   RecommendationFields,
@@ -105,6 +115,15 @@ const recommendationSchema = new Schema<
     title: { type: String, required: true, trim: true, minlength: 1, maxlength: TITLE_MAX },
     description: { type: String, required: true, trim: true, minlength: 1, maxlength: DESCRIPTION_MAX },
     suggestedValue: { type: String, trim: true, minlength: 1 },
+    confidence: { type: Number, min: 0, max: 1 },
+    proposedFile: {
+      type: {
+        path: { type: String, required: true, trim: true, minlength: 1 },
+        content: { type: String, required: true, minlength: 1, maxlength: PROPOSED_FILE_MAX },
+      },
+      default: undefined,
+      _id: false,
+    },
     status: {
       type: String,
       required: true,
@@ -137,6 +156,8 @@ recommendationSchema.statics.fromAi = async function fromAi(
     description: string;
     componentName?: string;
     suggestedValue?: string;
+    confidence?: number;
+    proposedFile?: RecommendationProposedFile;
   },
 ): Promise<RecommendationDocument> {
   const created = new this({
@@ -148,6 +169,8 @@ recommendationSchema.statics.fromAi = async function fromAi(
     description: input.description,
     ...(input.componentName !== undefined ? { componentName: input.componentName } : {}),
     ...(input.suggestedValue !== undefined ? { suggestedValue: input.suggestedValue } : {}),
+    ...(input.confidence !== undefined ? { confidence: input.confidence } : {}),
+    ...(input.proposedFile !== undefined ? { proposedFile: input.proposedFile } : {}),
   });
 
   return created.save() as unknown as Promise<RecommendationDocument>;

@@ -1,7 +1,11 @@
+import { Types } from 'mongoose';
+
 import { ConflictError, NotFoundError } from '../../domain/errors/index.js';
 import type { AnalysisDocument, ProjectDocument } from '../../models/entities/index.js';
 import type { AnalysisRepository } from '../../repositories/analysis.repository.js';
+import type { AuditLogRepository } from '../../repositories/audit-log.repository.js';
 import type { ProjectRepository } from '../../repositories/project.repository.js';
+import type { RecommendationService } from '../recommendations/recommendation.service.js';
 import type {
   CompleteAnalysisBody,
   FailAnalysisBody,
@@ -21,10 +25,14 @@ export interface AnalysisListResult {
   };
 }
 
+const entityOf = (analysis: AnalysisDocument) => ({ type: 'Analysis', id: analysis._id });
+
 export function createAnalysisService(
   analyses: AnalysisRepository,
   projects: ProjectRepository,
   workflow: AnalysisTrigger,
+  recommendations: RecommendationService,
+  audit: AuditLogRepository,
 ) {
   async function findOwnedProject(
     userId: string,
@@ -49,6 +57,28 @@ export function createAnalysisService(
     return analysis;
   }
 
+  async function recordCompleted(analysis: AnalysisDocument): Promise<void> {
+    let created = 0;
+
+    try {
+      created = await recommendations.generateForAnalysis(analysis);
+    } catch (error) {
+      await audit.record({
+        action: 'SYSTEM_ERROR',
+        level: 'ERROR',
+        entity: entityOf(analysis),
+        message: 'Recommendation audit failed',
+        metadata: { reason: error instanceof Error ? error.message : 'unknown' },
+      });
+    }
+
+    await audit.record({
+      action: 'ANALYSIS_COMPLETED',
+      entity: entityOf(analysis),
+      metadata: { recommendationsCreated: created },
+    });
+  }
+
   async function launch(userId: string, projectId: string): Promise<AnalysisDocument> {
     const project = await findOwnedProject(userId, projectId);
     const { repository } = project;
@@ -62,6 +92,14 @@ export function createAnalysisService(
     }
 
     const analysis = await analyses.request(project, userId);
+    const actor = new Types.ObjectId(userId);
+
+    await audit.record({
+      actor,
+      action: 'ANALYSIS_REQUESTED',
+      entity: entityOf(analysis),
+      metadata: { projectId, branch: repository.branch },
+    });
 
     try {
       await workflow.trigger({
@@ -73,10 +111,17 @@ export function createAnalysisService(
         },
       });
     } catch (error) {
-      await analysis.fail({
-        code: 'WORKFLOW_TRIGGER_FAILED',
-        message:
-          error instanceof Error ? error.message : 'Analysis workflow could not be started',
+      const message =
+        error instanceof Error ? error.message : 'Analysis workflow could not be started';
+
+      await analysis.fail({ code: 'WORKFLOW_TRIGGER_FAILED', message });
+      await audit.record({
+        actor,
+        action: 'ANALYSIS_FAILED',
+        level: 'ERROR',
+        entity: entityOf(analysis),
+        message,
+        metadata: { code: 'WORKFLOW_TRIGGER_FAILED' },
       });
       throw error;
     }
@@ -128,14 +173,26 @@ export function createAnalysisService(
     input: CompleteAnalysisBody,
   ): Promise<AnalysisDocument> {
     const analysis = await findForWorkflow(analysisId);
+    const completed = await analysis.complete(input as CompleteAnalysisInput);
 
-    return analysis.complete(input as CompleteAnalysisInput);
+    await recordCompleted(completed);
+
+    return completed;
   }
 
   async function fail(analysisId: string, error: FailAnalysisBody): Promise<AnalysisDocument> {
     const analysis = await findForWorkflow(analysisId);
+    const failed = await analysis.fail(error);
 
-    return analysis.fail(error);
+    await audit.record({
+      action: 'ANALYSIS_FAILED',
+      level: 'ERROR',
+      entity: entityOf(failed),
+      message: error.message,
+      metadata: { code: error.code },
+    });
+
+    return failed;
   }
 
   return { launch, list, get, start, complete, fail };

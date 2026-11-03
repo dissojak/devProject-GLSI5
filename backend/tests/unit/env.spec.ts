@@ -16,6 +16,7 @@ const VALID = {
   SESSION_SECRET: 'test-session-secret-that-is-at-least-32-bytes-long',
   N8N_ANALYSIS_WEBHOOK_URL: 'http://localhost:5678/webhook/pipeline-analysis',
   N8N_SHARED_SECRET: 'test-n8n-shared-secret-that-is-at-least-32-bytes-long',
+  N8N_AI_AUDIT_WEBHOOK_URL: 'http://localhost:5678/webhook/pipeline-ai-audit',
 };
 
 describe('config/env', () => {

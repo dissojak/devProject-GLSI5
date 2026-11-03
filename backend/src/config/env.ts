@@ -38,6 +38,10 @@ const RawEnvSchema = z.object({
     .string()
     .trim()
     .min(32, 'N8N_SHARED_SECRET must be at least 32 bytes'),
+  N8N_AI_AUDIT_WEBHOOK_URL: z
+    .string()
+    .trim()
+    .url('N8N_AI_AUDIT_WEBHOOK_URL must be a valid URL'),
 });
 
 export type Env = {
@@ -54,6 +58,7 @@ export type Env = {
   sessionSecret: string;
   n8nAnalysisWebhookUrl: string;
   n8nSharedSecret: string;
+  n8nAiAuditWebhookUrl: string;
 };
 
 let cachedEnv: Env | undefined;
@@ -100,6 +105,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     sessionSecret: parsed.data.SESSION_SECRET,
     n8nAnalysisWebhookUrl: parsed.data.N8N_ANALYSIS_WEBHOOK_URL,
     n8nSharedSecret: parsed.data.N8N_SHARED_SECRET,
+    n8nAiAuditWebhookUrl: parsed.data.N8N_AI_AUDIT_WEBHOOK_URL,
   };
 }
 
