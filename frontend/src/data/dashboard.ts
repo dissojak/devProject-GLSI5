@@ -254,8 +254,9 @@ export const AVATAR_MENU_ADMINISTRATION_SECTION: UserMenuSectionRow = {
       label: "Pending approvals",
       icon: "how_to_reg",
       badge: ADMIN_PENDING_APPROVALS_COUNT,
+      href: "/admin",
     },
-    { id: "users", label: "Users", icon: "group" },
+    { id: "users", label: "Users", icon: "group", href: "/admin" },
   ],
 };
 

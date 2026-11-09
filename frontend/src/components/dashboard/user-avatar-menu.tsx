@@ -58,6 +58,7 @@ function UserMenuItem({ row, onSelect }: { row: UserMenuItemRow; onSelect: () =>
       <Link href={row.href} role="menuitem" className={ITEM_ROW_BASE} onClick={onSelect}>
         <MenuIcon name={row.icon} />
         <span>{row.label}</span>
+        {row.badge ? <span className={cn(BADGE_PILL_BASE, "ml-auto")}>{row.badge}</span> : null}
       </Link>
     );
   }

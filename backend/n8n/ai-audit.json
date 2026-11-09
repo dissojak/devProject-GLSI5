@@ -54,7 +54,7 @@
     },
     {
       "parameters": {
-        "url": "={{ 'http://host.docker.internal:4000/api/v1/internal/analyses/' + $('webhook').first().json.body.analysisId + '/context' }}",
+        "url": "={{ 'http://localhost:4000/api/v1/internal/analyses/' + $('webhook').first().json.body.analysisId + '/context' }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {}
@@ -291,7 +291,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ 'http://host.docker.internal:4000/api/v1/internal/analyses/' + $('webhook').first().json.body.analysisId + '/recommendations' }}",
+        "url": "={{ 'http://localhost:4000/api/v1/internal/analyses/' + $('webhook').first().json.body.analysisId + '/recommendations' }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
@@ -345,7 +345,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ 'http://host.docker.internal:4000/api/v1/internal/analyses/' + $json.analysisId + '/audit-fail' }}",
+        "url": "={{ 'http://localhost:4000/api/v1/internal/analyses/' + $json.analysisId + '/audit-fail' }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,

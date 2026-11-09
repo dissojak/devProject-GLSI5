@@ -27,7 +27,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=http://host.docker.internal:4000/api/v1/internal/analyses/{{ $json.body.analysisId }}/start",
+        "url": "=http://localhost:4000/api/v1/internal/analyses/{{ $json.body.analysisId }}/start",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {}
@@ -81,7 +81,7 @@
     },
     {
       "parameters": {
-        "jsCode": "//tree feha les fichiers et les dossiers \nconst tree = $input.first().json;\n//SHA du commit selectionne\nconst commitSha = $('branch').first().json.commit.sha;\n\nconst USEFUL = /(^|\\/)(package\\.json|requirements[^/]*\\.txt|pyproject\\.toml|Pipfile|pom\\.xml|build\\.gradle(?:\\.kts)?|settings\\.gradle(?:\\.kts)?|gradle\\.properties|[^/]+\\.(?:csproj|fsproj)|Directory\\.Build\\.props|global\\.json|go\\.mod|Cargo\\.toml|composer\\.json|Gemfile|pubspec\\.yaml|[^/]+\\.slnx?|Dockerfile[^/]*|docker-compose[^/]*\\.ya?ml|compose\\.ya?ml|\\.dockerignore)$|^\\.github\\/workflows\\/[^/]+\\.ya?ml$/i;\nconst IGNORED = /(^|\\/)(node_modules|dist|vendor|\\.git)\\//;\n\nconst MAX_FILES = 40;\nconst MAX_SIZE = 200000;\n//Filtrer les fichiers intéressants\nif (!Array.isArray(tree.tree)) {\n  throw new Error('Invalid GitHub tree response');\n}\n\nif (tree.truncated === true) {\n  throw new Error('GitHub repository tree is truncated');\n}\n\nconst blobs = tree.tree.filter(\n  (entry) =>\n    entry.type === 'blob' &&\n    typeof entry.path === 'string'\n);\n\nconst treePaths = blobs.map(\n  (entry) => entry.path\n);\n\nconst files = blobs\n  .filter(\n    (entry) =>\n      USEFUL.test(entry.path) &&\n      !IGNORED.test(entry.path) &&\n      (entry.size ?? 0) <= MAX_SIZE\n  )\n  .sort((a, b) => {\n    const depthA = a.path.split('/').length;\n    const depthB = b.path.split('/').length;\n\n    return depthA - depthB ||\n      a.path.localeCompare(b.path);\n  })\n  .slice(0, MAX_FILES)\n  .map((entry) => ({\n    path: entry.path,\n  }));\n\nconst completeBody = {\n  detectedFiles: files.map((file) => file.path),\n  technologies: [],\n  components: [],\n  docker: {\n    hasDockerfile: treePaths.some((path) =>\n      /(^|\\/)dockerfile[^/]*$/i.test(path)\n    ),\n    hasCompose: treePaths.some((path) =>\n      /(^|\\/)docker-compose[^/]*\\.ya?ml$/i.test(path)\n    ),\n    findings: []\n  }\n};\n\nreturn [\n  {\n    json: {\n      commitSha,\n      truncated: tree.truncated,\n      treePaths,\n      files,\n      completeBody\n    }\n  }\n];\n"
+        "jsCode": "//tree feha les fichiers et les dossiers \nconst tree = $input.first().json;\n//SHA du commit selectionne\nconst commitSha = $('branch').first().json.commit.sha;\n\nconst USEFUL = /(^|\\/)(package\\.json|requirements[^/]*\\.txt|pyproject\\.toml|Pipfile|pom\\.xml|build\\.gradle(?:\\.kts)?|settings\\.gradle(?:\\.kts)?|gradle\\.properties|[^/]+\\.(?:csproj|fsproj)|Directory\\.Build\\.props|global\\.json|go\\.mod|Cargo\\.toml|composer\\.json|Gemfile|pubspec\\.yaml|[^/]+\\.slnx?|Dockerfile[^/]*|docker-compose[^/]*\\.ya?ml|compose\\.ya?ml|\\.dockerignore)$|^\\.github\\/workflows\\/[^/]+\\.ya?ml$/i;\nconst IGNORED = /(^|\\/)(node_modules|dist|vendor|\\.git)\\//;\n\nconst MAX_FILES = 40;\nconst MAX_SIZE = 200000;\n//Filtrer les fichiers int\u00e9ressants\nif (!Array.isArray(tree.tree)) {\n  throw new Error('Invalid GitHub tree response');\n}\n\nif (tree.truncated === true) {\n  throw new Error('GitHub repository tree is truncated');\n}\n\nconst blobs = tree.tree.filter(\n  (entry) =>\n    entry.type === 'blob' &&\n    typeof entry.path === 'string'\n);\n\nconst treePaths = blobs.map(\n  (entry) => entry.path\n);\n\nconst files = blobs\n  .filter(\n    (entry) =>\n      USEFUL.test(entry.path) &&\n      !IGNORED.test(entry.path) &&\n      (entry.size ?? 0) <= MAX_SIZE\n  )\n  .sort((a, b) => {\n    const depthA = a.path.split('/').length;\n    const depthB = b.path.split('/').length;\n\n    return depthA - depthB ||\n      a.path.localeCompare(b.path);\n  })\n  .slice(0, MAX_FILES)\n  .map((entry) => ({\n    path: entry.path,\n  }));\n\nconst completeBody = {\n  detectedFiles: files.map((file) => file.path),\n  technologies: [],\n  components: [],\n  docker: {\n    hasDockerfile: treePaths.some((path) =>\n      /(^|\\/)dockerfile[^/]*$/i.test(path)\n    ),\n    hasCompose: treePaths.some((path) =>\n      /(^|\\/)docker-compose[^/]*\\.ya?ml$/i.test(path)\n    ),\n    findings: []\n  }\n};\n\nreturn [\n  {\n    json: {\n      commitSha,\n      truncated: tree.truncated,\n      treePaths,\n      files,\n      completeBody\n    }\n  }\n];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -96,7 +96,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=http://host.docker.internal:4000/api/v1/internal/analyses/{{ $('Webhook').first().json.body.analysisId }}/complete",
+        "url": "=http://localhost:4000/api/v1/internal/analyses/{{ $('Webhook').first().json.body.analysisId }}/complete",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
@@ -123,7 +123,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=http://host.docker.internal:4000/api/v1/internal/analyses/{{ $('Webhook').first().json.body.analysisId }}/fail",
+        "url": "=http://localhost:4000/api/v1/internal/analyses/{{ $('Webhook').first().json.body.analysisId }}/fail",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
@@ -254,7 +254,7 @@
         "options": {}
       },
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.4,
+      "typeVersion": 2.3,
       "position": [
         1104,
         144
@@ -302,7 +302,7 @@
         "options": {}
       },
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.4,
+      "typeVersion": 2.3,
       "position": [
         2688,
         128
