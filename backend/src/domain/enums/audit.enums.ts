@@ -24,6 +24,8 @@ export const AUDIT_ACTIONS = [
   'DEPLOYMENT_STARTED',
   'DEPLOYMENT_SUCCEEDED',
   'DEPLOYMENT_FAILED',
+  'DEPLOYMENT_REQUESTED',
+  'DEPLOYMENT_CANCELLED',
   'SYSTEM_ERROR',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

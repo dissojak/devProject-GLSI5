@@ -50,6 +50,22 @@ export function createListAnalysesHandler(service: AnalysisService): RequestHand
   };
 }
 
+export function createListAllAnalysesHandler(service: AnalysisService): RequestHandler {
+  return async (req, res, next) => {
+    try {
+      const query = parseOrThrow(listAnalysesQuerySchema, req.query, 'Invalid query');
+      const { items, pagination } = await service.listAll(
+        res.locals.userId as string,
+        query,
+      );
+
+      res.json({ message: 'Analyses retrieved', data: items, pagination });
+    } catch (error) {
+      next(error);
+    }
+  };
+}
+
 export function createGetAnalysisHandler(service: AnalysisService): RequestHandler {
   return async (req, res, next) => {
     try {

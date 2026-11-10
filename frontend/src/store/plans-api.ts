@@ -1,0 +1,55 @@
+import { apiSlice } from "@/store/api";
+import type { DeploymentResponse } from "@/types/deployment";
+import type {
+  DeployPlanBody,
+  PlanListResponse,
+  PlanResponse,
+  RejectPlanBody,
+} from "@/types/plan";
+
+export const plansApi = apiSlice.injectEndpoints({
+  endpoints: (build) => ({
+    listPlans: build.query<PlanListResponse, { page: number; limit: number }>({
+      query: ({ page, limit }) => ({ url: "/plans", params: { page, limit } }),
+      providesTags: [{ type: "Plans", id: "ALL" }],
+    }),
+    approvePlan: build.mutation<PlanResponse, { planId: string }>({
+      query: ({ planId }) => ({ url: `/plans/${planId}/approve`, method: "POST" }),
+      invalidatesTags: [
+        { type: "Plans", id: "ALL" },
+        { type: "Deployments", id: "ALL" },
+      ],
+    }),
+    rejectPlan: build.mutation<PlanResponse, { planId: string; body: RejectPlanBody }>({
+      query: ({ planId, body }) => ({
+        url: `/plans/${planId}/reject`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: [{ type: "Plans", id: "ALL" }],
+    }),
+    revisePlan: build.mutation<PlanResponse, { planId: string }>({
+      query: ({ planId }) => ({ url: `/plans/${planId}/revisions`, method: "POST" }),
+      invalidatesTags: [{ type: "Plans", id: "ALL" }],
+    }),
+    deployPlan: build.mutation<DeploymentResponse, { planId: string; body: DeployPlanBody }>({
+      query: ({ planId, body }) => ({
+        url: `/plans/${planId}/deployments`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: [
+        { type: "Plans", id: "ALL" },
+        { type: "Deployments", id: "ALL" },
+      ],
+    }),
+  }),
+});
+
+export const {
+  useListPlansQuery,
+  useApprovePlanMutation,
+  useRejectPlanMutation,
+  useRevisePlanMutation,
+  useDeployPlanMutation,
+} = plansApi;

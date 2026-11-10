@@ -17,6 +17,9 @@ import {
   ENVIRONMENT_FILTER_ROWS,
   ENVIRONMENT_LABELS,
   LOGOUT_ROUTE,
+  ANALYSES_ROUTE,
+  PLANS_ROUTE,
+  DEPLOYMENTS_ROUTE,
   PROJECT_PAGINATION_ROW,
   PROJECT_STATS_ROWS,
   PROJECTS_HEADING_ROW,
@@ -53,14 +56,21 @@ describe("dashboard data rows", () => {
     expect(DASHBOARD_SOON_LABEL).toBe("Soon");
   });
 
-  it("keeps the telemetry navigation honest about unrealized destinations", () => {
+  it("routes every pipeline stage as a real destination", () => {
     expect(DASHBOARD_NAV_ROWS).toHaveLength(4);
-    const activeRows = DASHBOARD_NAV_ROWS.filter((row) => row.href !== undefined);
-    const soonRows = DASHBOARD_NAV_ROWS.filter((row) => row.href === undefined);
-    expect(activeRows).toHaveLength(1);
-    expect(activeRows[0]).toMatchObject({ label: "Projects", href: "/projects", icon: "folder_open" });
-    expect(soonRows.map((row) => row.label)).toEqual(["Analyses", "Plans", "Deployments"]);
-    expect(soonRows.every((row) => row.kind === "soon")).toBe(true);
+    expect(DASHBOARD_NAV_ROWS.map((row) => row.href)).toEqual([
+      PROJECTS_ROUTE.href,
+      ANALYSES_ROUTE.href,
+      PLANS_ROUTE.href,
+      DEPLOYMENTS_ROUTE.href,
+    ]);
+    expect(DASHBOARD_NAV_ROWS.every((row) => row.kind === "active")).toBe(true);
+    expect(DASHBOARD_NAV_ROWS.map((row) => row.icon)).toEqual([
+      "folder_open",
+      "analytics",
+      "schema",
+      "alt_route",
+    ]);
   });
 
   it("greets the session user without hardcoding an identity", () => {

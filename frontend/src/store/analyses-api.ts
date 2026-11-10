@@ -26,6 +26,10 @@ export const analysesApi = apiSlice.injectEndpoints({
       }),
       providesTags: (_result, _error, arg) => [{ type: "Analyses", id: arg.projectId }],
     }),
+    listAllAnalyses: build.query<AnalysisListResponse, { page: number; limit: number }>({
+      query: ({ page, limit }) => ({ url: "/analyses", params: { page, limit } }),
+      providesTags: [{ type: "Analyses", id: "ALL" }],
+    }),
     getAnalysis: build.query<
       AnalysisResponse,
       { projectId: string; analysisId: string }
@@ -115,4 +119,5 @@ export const {
   useAcceptRecommendationMutation,
   useRejectRecommendationMutation,
   useLaunchAiAuditMutation,
+  useListAllAnalysesQuery,
 } = analysesApi;

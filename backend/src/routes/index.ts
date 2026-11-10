@@ -12,6 +12,10 @@ import { createRecommendationInternalRouter } from './recommendation-internal.ro
 import { createAiAuditRouter } from './ai-audit.routes.js';
 import { createAiAuditInternalRouter } from './ai-audit-internal.routes.js';
 import { createAnalysisInternalRouter } from './analysis-internal.routes.js';
+import { createAnalysisGlobalRouter } from './analysis-global.routes.js';
+import { createPlanRouter } from './plan.routes.js';
+import { createDeploymentRouter } from './deployment.routes.js';
+import { createDeploymentInternalRouter } from './deployment-internal.routes.js';
 import { createUsersRouter } from './users.routes.js';
 import { createUserApprovalRouter } from './user-approval.routes.js';
 import { createProfileRouter } from './profile.routes.js';
@@ -25,6 +29,8 @@ import { AuthIdentityRepository } from '../repositories/auth-identity.repository
 import { ProjectRepository } from '../repositories/project.repository.js';
 import { AnalysisRepository } from '../repositories/analysis.repository.js';
 import { RecommendationRepository } from '../repositories/recommendation.repository.js';
+import { PlanRepository } from '../repositories/plan.repository.js';
+import { DeploymentRepository } from '../repositories/deployment.repository.js';
 import { AuditLogRepository } from '../repositories/audit-log.repository.js';
 
 // Functional service factories
@@ -35,6 +41,8 @@ import { createSessionTokenService } from '../services/auth/session-token.servic
 import { createProjectService } from '../services/project/project.service.js';
 import { createRepositoryLinkService } from '../services/repository-link/repository-link.service.js';
 import { createAnalysisService } from '../services/analysis/analysis.service.js';
+import { createPlanService } from '../services/plans/plan.service.js';
+import { createDeploymentService } from '../services/deployments/deployment.service.js';
 import { createRecommendationService } from '../services/recommendations/recommendation.service.js';
 import { createAiAuditService } from '../services/ai-audit/ai-audit.service.js';
 import { createN8nAiAuditTrigger } from '../services/ai-audit/n8n-ai-audit-trigger.js';
@@ -64,6 +72,8 @@ export function createApiRouter(): Router {
   const projects = new ProjectRepository();
   const analyses = new AnalysisRepository();
   const recommendations = new RecommendationRepository();
+  const plans = new PlanRepository();
+  const deployments = new DeploymentRepository();
   const auditLogs = new AuditLogRepository();
 
   // Shared services
@@ -85,6 +95,8 @@ export function createApiRouter(): Router {
     recommendationService,
     auditLogs,
   );
+  const planService = createPlanService(plans, projects, deployments, auditLogs);
+  const deploymentService = createDeploymentService(deployments, projects, auditLogs);
   const requireInternalSecret = createRequireInternalSecret(env.n8nSharedSecret);
   const githubOAuthService = createGithubOAuthService(
     env.githubClientId,
@@ -130,6 +142,11 @@ export function createApiRouter(): Router {
   router.use('/projects', createRecommendationRouter(recommendationService, requireAuth));
   router.use('/projects', createAiAuditRouter(aiAuditService, requireAuth));
 
+  // Cross-project pipeline boards (analyses / plans / deployments)
+  router.use('/analyses', createAnalysisGlobalRouter(analysisService, requireAuth));
+  router.use('/plans', createPlanRouter(planService, requireAuth));
+  router.use('/deployments', createDeploymentRouter(deploymentService, requireAuth));
+
   router.use(
     '/internal/analyses',
     createAnalysisInternalRouter(analysisService, requireInternalSecret),
@@ -141,6 +158,10 @@ export function createApiRouter(): Router {
   router.use(
     '/internal/analyses',
     createAiAuditInternalRouter(aiAuditService, requireInternalSecret),
+  );
+  router.use(
+    '/internal/deployments',
+    createDeploymentInternalRouter(deploymentService, requireInternalSecret),
   );
   // Self-scoped profile (self-vs-admin read: mounted at /profile)
   router.use('/profile', createProfileRouter(profileService, requireAuth));

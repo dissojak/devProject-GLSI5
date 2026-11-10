@@ -148,6 +148,24 @@ export function createAnalysisService(
     };
   }
 
+  /** Cross-project board: every analysis the user requested, newest first. */
+  async function listAll(
+    userId: string,
+    query: ListAnalysesQuery,
+  ): Promise<AnalysisListResult> {
+    const { items, total } = await analyses.findPageByOwner(userId, query);
+
+    return {
+      items,
+      pagination: {
+        page: query.page,
+        limit: query.limit,
+        total,
+        pageCount: Math.ceil(total / query.limit),
+      },
+    };
+  }
+
   async function get(
     userId: string,
     projectId: string,
@@ -195,7 +213,7 @@ export function createAnalysisService(
     return failed;
   }
 
-  return { launch, list, get, start, complete, fail };
+  return { launch, list, listAll, get, start, complete, fail };
 }
 
 export type AnalysisService = ReturnType<typeof createAnalysisService>;

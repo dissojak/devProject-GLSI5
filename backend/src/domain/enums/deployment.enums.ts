@@ -22,3 +22,6 @@ export const ARGO_HEALTH_STATUSES = [
   'UNKNOWN',
 ] as const;
 export type ArgoHealthStatus = (typeof ARGO_HEALTH_STATUSES)[number];
+
+/** Repository folder the gitops workflow commits generated manifests to (deployment.gitops.path). */
+export const DEPLOYMENT_MANIFESTS_PATH = 'k8s';

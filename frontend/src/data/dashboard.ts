@@ -27,6 +27,24 @@ export const PROJECTS_ROUTE: NavLink = {
   href: "/projects",
 };
 
+export const ANALYSES_ROUTE: NavLink = {
+  id: "analyses",
+  label: "Analyses",
+  href: "/analyses",
+};
+
+export const PLANS_ROUTE: NavLink = {
+  id: "plans",
+  label: "Plans",
+  href: "/plans",
+};
+
+export const DEPLOYMENTS_ROUTE: NavLink = {
+  id: "deployments",
+  label: "Deployments",
+  href: "/deployments",
+};
+
 export const PROFILE_ROUTE: NavLink = {
   id: "profile",
   label: "Profile",
@@ -63,16 +81,35 @@ export const DASHBOARD_SEARCH_ROW: SearchRow = {
 
 export const DASHBOARD_SOON_LABEL = "Soon";
 
-export const DASHBOARD_NAV_ROWS: DashboardNavRow[] = [  {
+export const DASHBOARD_NAV_ROWS: DashboardNavRow[] = [
+  {
     id: "projects",
     label: "Projects",
     href: PROJECTS_ROUTE.href,
     icon: "folder_open",
     kind: "active",
   },
-  { id: "analyses", label: "Analyses", icon: "analytics", kind: "soon" },
-  { id: "plans", label: "Plans", icon: "schema", kind: "soon" },
-  { id: "deployments", label: "Deployments", icon: "alt_route", kind: "soon" },
+  {
+    id: "analyses",
+    label: "Analyses",
+    href: ANALYSES_ROUTE.href,
+    icon: "analytics",
+    kind: "active",
+  },
+  {
+    id: "plans",
+    label: "Plans",
+    href: PLANS_ROUTE.href,
+    icon: "schema",
+    kind: "active",
+  },
+  {
+    id: "deployments",
+    label: "Deployments",
+    href: DEPLOYMENTS_ROUTE.href,
+    icon: "alt_route",
+    kind: "active",
+  },
 ];
 
 export const DASHBOARD_GREETING_ROW: GreetingRow = {

@@ -106,6 +106,21 @@ export class AnalysisRepository {
     return { items: items as unknown as AnalysisDocument[], total };
   }
 
+  /** Every analysis the user has ever requested, newest first (cross-project board). */
+  async findPageByOwner(userId: string, query: AnalysisPageQuery): Promise<AnalysisPage> {
+    const filter = { requestedBy: userId };
+    const [items, total] = await Promise.all([
+      Analysis.find(filter)
+        .sort({ createdAt: -1 })
+        .skip((query.page - 1) * query.limit)
+        .limit(query.limit)
+        .exec(),
+      Analysis.countDocuments(filter).exec(),
+    ]);
+
+    return { items: items as unknown as AnalysisDocument[], total };
+  }
+
   /**
    * Existence probe. Unknown filter keys throw at the model boundary
    * (`strictQuery: 'throw'`), never silently strip.
