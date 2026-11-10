@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { AnalysesTable } from "@/components/pipeline/analyses-table";
 import { PipelineEmpty } from "@/components/pipeline/pipeline-empty";
@@ -9,16 +9,18 @@ import { PipelineFilterStrip } from "@/components/pipeline/pipeline-filter-strip
 import { PipelinePagination } from "@/components/pipeline/pipeline-pagination";
 import { PipelineSkeleton } from "@/components/pipeline/pipeline-skeleton";
 import { PipelineStageHeader } from "@/components/pipeline/pipeline-stage-header";
+import { useToast } from "@/components/toast/toast-provider";
 import {
   ANALYSES_EMPTY_ROW,
   ANALYSES_ERROR_ROW,
   ANALYSES_FILTER_ROWS,
   ANALYSES_STAGE_ROW,
+  ANALYSES_TOAST_ROWS,
 } from "@/data/analyses-board";
 import { PIPELINE_FILTER_ALL_ID, PIPELINE_FILTER_EMPTY_NOTE, PIPELINE_SYNCING_NOTE } from "@/data/pipeline-boards";
 import { PROJECTS_ROUTE } from "@/data/dashboard";
 import { AUTH_LOGIN_ROUTE } from "@/data/navigation";
-import { useAnalysesBoard } from "@/hooks/use-analyses-board";
+import { useAnalysisActions, useAnalysesBoard } from "@/hooks/use-analyses-board";
 import { useAuthGate } from "@/hooks/use-session-guard";
 import { useProjectNames } from "@/hooks/use-project-names";
 import { pipelineFilterRows, pipelineStatusCounts } from "@/utils/pipeline-view";
@@ -29,12 +31,16 @@ const statusOf = (row: Analysis) => row.status;
 /**
  * Stage 01 · Evidence. Gate → skeleton → error/empty sheet → strip + table.
  * Rows poll every 5s; the strip tallies the loaded page client-side.
+ * The Draft plan action hands a COMPLETED row to Stage 02 (the planner).
  */
 export function AnalysesBoard() {
   const gate = useAuthGate(AUTH_LOGIN_ROUTE.href);
+  const toast = useToast();
   const [page, setPage] = useState(1);
   const [filter, setFilter] = useState(PIPELINE_FILTER_ALL_ID);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const board = useAnalysesBoard(page);
+  const actions = useAnalysisActions();
   const projectNames = useProjectNames();
 
   const rows = useMemo(() => board.data?.data ?? [], [board.data]);
@@ -42,6 +48,27 @@ export function AnalysesBoard() {
   const visibleRows = useMemo(
     () => pipelineFilterRows(rows, filter, statusOf),
     [rows, filter],
+  );
+
+  const draft = useCallback(
+    async (projectId: string, analysisId: string) => {
+      setBusyId(analysisId);
+      try {
+        const failure = await actions.draft(projectId, analysisId);
+        if (failure === null) {
+          toast.push(ANALYSES_TOAST_ROWS.drafted);
+        } else {
+          toast.push({
+            tone: ANALYSES_TOAST_ROWS.failed.tone,
+            title: ANALYSES_TOAST_ROWS.failed.title,
+            message: failure,
+          });
+        }
+      } finally {
+        setBusyId(null);
+      }
+    },
+    [actions, toast],
   );
 
   if (gate !== "granted" || board.loading) {
@@ -71,7 +98,12 @@ export function AnalysesBoard() {
             ) : null}
           </div>
           {visibleRows.length > 0 ? (
-            <AnalysesTable rows={visibleRows} projectNames={projectNames} />
+            <AnalysesTable
+              rows={visibleRows}
+              projectNames={projectNames}
+              busyId={busyId}
+              onDraft={draft}
+            />
           ) : (
             <p className="rounded-2xl border border-steel/50 bg-panel/40 px-6 py-10 text-center font-mono text-label-sm text-mist">
               {PIPELINE_FILTER_EMPTY_NOTE}

@@ -3,6 +3,7 @@ import type { RequestHandler } from 'express';
 import { parseOrThrow } from '../shared/validation/request-validation.js';
 import {
   deployPlanBodySchema,
+  draftPlanBodySchema,
   listPlansQuerySchema,
   planParamsSchema,
   rejectPlanBodySchema,
@@ -69,6 +70,23 @@ export function createRevisePlanHandler(service: PlanService): RequestHandler {
       const plan = await service.revise(res.locals.userId as string, planId);
 
       res.status(201).json({ message: 'Deployment plan revision created', data: plan });
+    } catch (error) {
+      next(error);
+    }
+  };
+}
+
+export function createDraftPlanHandler(service: PlanService): RequestHandler {
+  return async (req, res, next) => {
+    try {
+      const body = parseOrThrow(draftPlanBodySchema, req.body, 'Invalid draft payload');
+      const plan = await service.draft(
+        res.locals.userId as string,
+        body.projectId,
+        body.analysisId,
+      );
+
+      res.status(201).json({ message: 'Deployment plan draft created', data: plan });
     } catch (error) {
       next(error);
     }

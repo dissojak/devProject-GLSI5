@@ -6,6 +6,7 @@ import type {
   PipelineFilterRow,
   PipelineLoadingRow,
   PipelineStageRow,
+  StatusActionRow,
   StatusChipRow,
 } from "@/types/pipeline-board";
 
@@ -39,9 +40,22 @@ export const ANALYSES_TABLE_COLUMNS: PipelineColumnRow[] = [
   { id: "technologies", label: "Technologies" },
   { id: "duration", label: "Duration" },
   { id: "started", label: "Started" },
+  { id: "actions", label: "Next step" },
 ];
 
 export const ANALYSES_TECH_PREVIEW_COUNT = 3;
+
+/**
+ * The one action a status offers, rendered via lookup (no branches):
+ * only a COMPLETED analysis can produce a plan draft (the pipeline's
+ * Evidence → Contract handoff); everything else waits on the workflow.
+ */
+export const ANALYSIS_ROW_ACTIONS: Record<AnalysisStatus, StatusActionRow | null> = {
+  PENDING: null,
+  RUNNING: null,
+  COMPLETED: { label: "Draft plan", icon: "schema", variant: "champagne" },
+  FAILED: null,
+};
 
 /** Rows whose status still advances on its own get the live pulse dot. */
 export const ANALYSIS_LIVE_STATUS: Record<AnalysisStatus, boolean> = {
@@ -70,3 +84,16 @@ export const ANALYSES_LOADING_ROW: PipelineLoadingRow = {
   heading: "Reading the analysis board",
   copy: "Pulling your latest scans from the planner core.",
 };
+
+export const ANALYSES_TOAST_ROWS = {
+  drafted: {
+    tone: "champagne",
+    title: "Plan draft created",
+    message: "The container contract is on the plans board, ready for review.",
+  },
+  failed: {
+    tone: "crimson",
+    title: "Action failed",
+    fallback: "The planner core did not complete the draft. Try again.",
+  },
+} as const;

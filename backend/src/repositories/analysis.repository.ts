@@ -27,6 +27,19 @@ export class AnalysisRepository {
     return Analysis.request({ project, userId: new Types.ObjectId(userId) });
   }
 
+  /** One analysis by id, or null. */
+  async findById(
+    analysisId: Types.ObjectId | string,
+    options: RepositoryOptions = {},
+  ): Promise<AnalysisDocument | null> {
+    const query = Analysis.findById(analysisId).session(options.session ?? null);
+    if (options.withDeleted) {
+      query.setOptions({ withDeleted: true });
+    }
+
+    return (await query.exec()) as unknown as AnalysisDocument | null;
+  }
+
   async hasActive(projectId: string): Promise<boolean> {
     const since = new Date(Date.now() - ACTIVE_WINDOW_MS);
     const found = await Analysis.exists({

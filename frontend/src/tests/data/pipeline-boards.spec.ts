@@ -11,7 +11,9 @@ import {
   ANALYSES_STAGE_ROW,
   ANALYSES_TABLE_COLUMNS,
   ANALYSES_EMPTY_ROW,
+  ANALYSES_TOAST_ROWS,
   ANALYSIS_LIVE_STATUS,
+  ANALYSIS_ROW_ACTIONS,
   ANALYSIS_STATUS_CHIPS,
 } from "@/data/analyses-board";
 import {
@@ -95,10 +97,32 @@ describe("pipeline board rows", () => {
       "Technologies",
       "Duration",
       "Started",
+      "Next step",
     ]);
     expect(ANALYSES_EMPTY_ROW).toMatchObject({ icon: "analytics" });
     expect(ANALYSES_ERROR_ROW).toMatchObject({ icon: "warning", actionLabel: "Try again" });
     expect(ANALYSES_LOADING_ROW).toMatchObject({ icon: "radar" });
+  });
+
+  it("encodes the draft action as a status registry, never a branch", () => {
+    // Only a COMPLETED analysis can hand off to Stage 02; the rest wait.
+    expect(ANALYSIS_ROW_ACTIONS.PENDING).toBeNull();
+    expect(ANALYSIS_ROW_ACTIONS.RUNNING).toBeNull();
+    expect(ANALYSIS_ROW_ACTIONS.FAILED).toBeNull();
+    expect(ANALYSIS_ROW_ACTIONS.COMPLETED).toMatchObject({
+      label: "Draft plan",
+      icon: "schema",
+      variant: "champagne",
+    });
+    for (const status of ANALYSIS_STATUSES) {
+      const action = ANALYSIS_ROW_ACTIONS[status];
+      if (action !== null) {
+        expect(action.label.length).toBeGreaterThan(0);
+        expect(action.icon.length).toBeGreaterThan(0);
+      }
+    }
+    expect(ANALYSES_TOAST_ROWS.drafted.title.length).toBeGreaterThan(0);
+    expect(ANALYSES_TOAST_ROWS.failed.title.length).toBeGreaterThan(0);
   });
 
   it("encodes plan actions as a status registry, never a branch", () => {

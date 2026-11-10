@@ -1,6 +1,6 @@
 import type { Types } from 'mongoose';
 
-import { DeploymentPlan, type DeploymentPlanDocument, type DeploymentPlanDocumentMethods, type DeploymentPlanFields, type DeploymentPlanVirtuals } from '../models/entities/index.js';
+import { DeploymentPlan, type DeploymentPlanDocument, type DeploymentPlanDocumentMethods, type DeploymentPlanFields, type DeploymentPlanVirtuals, type PlanComponent } from '../models/entities/index.js';
 import { BaseRepository, type RepositoryFilter, type RepositoryOptions } from './base.repository.js';
 
 export class PlanRepository extends BaseRepository<DeploymentPlanFields, DeploymentPlanDocumentMethods, DeploymentPlanVirtuals> {
@@ -56,5 +56,17 @@ export class PlanRepository extends BaseRepository<DeploymentPlanFields, Deploym
 
   listByProject(projectId: Types.ObjectId | string, options: RepositoryOptions = {}): Promise<DeploymentPlanDocument[]> {
     return this.find({ project: projectId }, { ...options, sort: { version: -1 } });
+  }
+
+  /** Persists a fully-formed DRAFT (the document static validates invariants). */
+  draft(input: {
+    projectId: Types.ObjectId;
+    analysisId: Types.ObjectId;
+    createdBy: Types.ObjectId;
+    version: number;
+    components: PlanComponent[];
+    recommendations?: Types.ObjectId[];
+  }): Promise<DeploymentPlanDocument> {
+    return DeploymentPlan.draft(input) as unknown as Promise<DeploymentPlanDocument>;
   }
 }

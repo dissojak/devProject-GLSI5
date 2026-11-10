@@ -47,6 +47,7 @@ import { createRecommendationService } from '../services/recommendations/recomme
 import { createAiAuditService } from '../services/ai-audit/ai-audit.service.js';
 import { createN8nAiAuditTrigger } from '../services/ai-audit/n8n-ai-audit-trigger.js';
 import { createN8nAnalysisTrigger } from '../services/analysis/n8n-analysis-trigger.js';
+import { createN8nDeploymentTrigger } from '../services/deployments/n8n-deployment-trigger.js';
 import { createUserService } from '../services/users/user.service.js';
 import { createUserApprovalService } from '../services/users/user-approval.service.js';
 import { createProfileService } from '../services/profile/profile.service.js';
@@ -85,6 +86,10 @@ export function createApiRouter(): Router {
   const profileService = createProfileService(users);
   const repositoryLink = createRepositoryLinkService(projects);
   const analysisTrigger = createN8nAnalysisTrigger(env.n8nAnalysisWebhookUrl, env.n8nSharedSecret);
+  const deploymentTrigger = createN8nDeploymentTrigger(
+    env.n8nDeploymentWebhookUrl,
+    env.n8nSharedSecret,
+  );
   const recommendationService = createRecommendationService(recommendations, analyses, auditLogs);
   const aiAuditTrigger = createN8nAiAuditTrigger(env.n8nAiAuditWebhookUrl, env.n8nSharedSecret);
   const aiAuditService = createAiAuditService(aiAuditTrigger, analyses, projects, auditLogs);
@@ -95,7 +100,15 @@ export function createApiRouter(): Router {
     recommendationService,
     auditLogs,
   );
-  const planService = createPlanService(plans, projects, deployments, auditLogs);
+  const planService = createPlanService(
+    plans,
+    projects,
+    deployments,
+    auditLogs,
+    analyses,
+    recommendations,
+    deploymentTrigger,
+  );
   const deploymentService = createDeploymentService(deployments, projects, auditLogs);
   const requireInternalSecret = createRequireInternalSecret(env.n8nSharedSecret);
   const githubOAuthService = createGithubOAuthService(

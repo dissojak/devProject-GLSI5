@@ -2,6 +2,7 @@ import { apiSlice } from "@/store/api";
 import type { DeploymentResponse } from "@/types/deployment";
 import type {
   DeployPlanBody,
+  DraftPlanBody,
   PlanListResponse,
   PlanResponse,
   RejectPlanBody,
@@ -12,6 +13,10 @@ export const plansApi = apiSlice.injectEndpoints({
     listPlans: build.query<PlanListResponse, { page: number; limit: number }>({
       query: ({ page, limit }) => ({ url: "/plans", params: { page, limit } }),
       providesTags: [{ type: "Plans", id: "ALL" }],
+    }),
+    draftPlan: build.mutation<PlanResponse, { body: DraftPlanBody }>({
+      query: ({ body }) => ({ url: "/plans", method: "POST", body }),
+      invalidatesTags: [{ type: "Plans", id: "ALL" }],
     }),
     approvePlan: build.mutation<PlanResponse, { planId: string }>({
       query: ({ planId }) => ({ url: `/plans/${planId}/approve`, method: "POST" }),
@@ -48,6 +53,7 @@ export const plansApi = apiSlice.injectEndpoints({
 
 export const {
   useListPlansQuery,
+  useDraftPlanMutation,
   useApprovePlanMutation,
   useRejectPlanMutation,
   useRevisePlanMutation,

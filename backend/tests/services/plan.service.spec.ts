@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { Types } from 'mongoose';
 
 import {
   Analysis,
   DeploymentPlan,
   Project,
+  Recommendation,
   User,
   type AnalysisDocument,
   type DeploymentPlanDocument,
@@ -12,16 +12,20 @@ import {
   type UserDocument,
 } from '../../src/models/entities/index.js';
 import {
+  AnalysisRepository,
   AuditLogRepository,
   DeploymentRepository,
   PlanRepository,
   ProjectRepository,
+  RecommendationRepository,
 } from '../../src/repositories/index.js';
 import {
+  ConflictError,
   InvariantViolationError,
   InvalidStateTransitionError,
   NotFoundError,
 } from '../../src/domain/errors/index.js';
+import type { DeploymentTrigger } from '../../src/services/deployments/n8n-deployment-trigger.js';
 import { createPlanService } from '../../src/services/plans/plan.service.js';
 import { connectTestingModule, disconnectTestingModule } from '../integration/test-database.js';
 
@@ -45,6 +49,9 @@ let analysis: AnalysisDocument;
 let plans: PlanRepository;
 let service: ReturnType<typeof createPlanService>;
 
+/** Accepting trigger: the workflow webhook is exercised in pipeline-flow.spec. */
+const acceptingTrigger: DeploymentTrigger = { trigger: async () => undefined };
+
 async function seededPlan(version: number): Promise<DeploymentPlanDocument> {
   return DeploymentPlan.draft({
     projectId: project._id,
@@ -57,13 +64,22 @@ async function seededPlan(version: number): Promise<DeploymentPlanDocument> {
 
 beforeAll(async () => {
   await connectTestingModule('plan_service_test');
-  await Promise.all([User.init(), Project.init(), Analysis.init(), DeploymentPlan.init()]);
+  await Promise.all([
+    User.init(),
+    Project.init(),
+    Analysis.init(),
+    DeploymentPlan.init(),
+    Recommendation.init(),
+  ]);
   plans = new PlanRepository();
   service = createPlanService(
     plans,
     new ProjectRepository(),
     new DeploymentRepository(),
     new AuditLogRepository(),
+    new AnalysisRepository(),
+    new RecommendationRepository(),
+    acceptingTrigger,
   );
 });
 
@@ -77,6 +93,7 @@ beforeEach(async () => {
     Project.deleteMany({}).setOptions({ withDeleted: true }),
     Analysis.deleteMany({}).setOptions({ withDeleted: true }),
     DeploymentPlan.deleteMany({}).setOptions({ withDeleted: true }),
+    Recommendation.deleteMany({}).setOptions({ withDeleted: true }),
   ]);
 
   owner = await User.register({ name: 'plan owner', email: 'owner@example.com', password: 'LongEnough1!' });
@@ -87,6 +104,7 @@ beforeEach(async () => {
   analysis = await (await Analysis.request({ project, userId: owner._id })).start();
   analysis = await analysis.complete({
     detectedFiles: ['src/index.ts'],
+    components: [{ name: 'api', type: 'BACKEND', rootPath: '.' }],
     docker: { hasDockerfile: true, hasCompose: false, findings: [] },
   });
 });
@@ -190,7 +208,91 @@ describe('plan service', () => {
     const plan = await seededPlan(1);
 
     await expect(
-      service.deploy(String(owner._id), String(plan.id), 'STAGING'),
+      service.deploy(String(owner._id), String(plan.id), 'DEVELOPMENT'),
     ).rejects.toBeInstanceOf(InvariantViolationError);
+  });
+
+  describe('draft', () => {
+    it('mints plan v1 from a completed analysis with deterministic defaults', async () => {
+      const draft = await service.draft(String(owner._id), String(project._id), String(analysis._id));
+
+      expect(draft.status).toBe('DRAFT');
+      expect(draft.version).toBe(1);
+      expect(String(draft.project)).toBe(String(project._id));
+      expect(String(draft.analysis)).toBe(String(analysis._id));
+      expect(draft.components).toHaveLength(1);
+      expect(draft.components[0]?.name).toBe('api');
+      // The analysis carries no ports: defaults come from the registry.
+      expect(draft.components[0]?.containerPort).toBe(3000);
+      expect(draft.components[0]?.replicas).toBe(2);
+      expect(draft.components[0]?.hpa.enabled).toBe(false);
+      expect(draft.components[0]?.ingress.enabled).toBe(false);
+    });
+
+    it('pins only ACCEPTED recommendations into the draft', async () => {
+      const recommendations = new RecommendationRepository();
+      const accepted = await recommendations.record({
+        analysisId: analysis._id,
+        generatedBy: { provider: 'n8n', model: 'audit-v1' },
+        type: 'DOCKER',
+        severity: 'WARNING',
+        title: 'pin me',
+        description: 'accepted recommendation',
+      });
+      await accepted.accept(owner._id);
+      await recommendations.record({
+        analysisId: analysis._id,
+        generatedBy: { provider: 'n8n', model: 'audit-v1' },
+        type: 'GENERAL',
+        severity: 'INFO',
+        title: 'ignore me',
+        description: 'still pending',
+      });
+
+      const draft = await service.draft(String(owner._id), String(project._id), String(analysis._id));
+
+      expect(draft.recommendations).toHaveLength(1);
+      expect(String(draft.recommendations[0])).toBe(String(accepted._id));
+    });
+
+    it('increments the version per project instead of restarting at 1', async () => {
+      await service.draft(String(owner._id), String(project._id), String(analysis._id));
+
+      const second = await service.draft(String(owner._id), String(project._id), String(analysis._id));
+
+      expect(second.version).toBe(2);
+    });
+
+    it('refuses a draft from an analysis that is not completed', async () => {
+      const pending = await Analysis.request({ project, userId: owner._id });
+
+      await expect(
+        service.draft(String(owner._id), String(project._id), String(pending._id)),
+      ).rejects.toBeInstanceOf(ConflictError);
+    });
+
+    it('hides a foreign project and a foreign analysis behind 404', async () => {
+      const strangerProject = await (
+        await Project.createFor({
+          ownerId: stranger._id,
+          name: 'foreign project',
+          description: 'd',
+        })
+      )
+        .connectRepository({ url: 'https://github.com/other/two' }, 'main')
+        .then((pending) => pending.markRepositoryVerified('main'));
+      const foreignAnalysis = await Analysis.request({
+        project: strangerProject,
+        userId: stranger._id,
+      });
+
+      await expect(
+        service.draft(String(owner._id), String(strangerProject._id), String(analysis._id)),
+      ).rejects.toBeInstanceOf(NotFoundError);
+
+      await expect(
+        service.draft(String(owner._id), String(project._id), String(foreignAnalysis._id)),
+      ).rejects.toBeInstanceOf(NotFoundError);
+    });
   });
 });

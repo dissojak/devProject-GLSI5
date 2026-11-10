@@ -83,6 +83,18 @@ describe('AnalysisRepository', () => {
       }
     });
   });
+
+  describe('findById', () => {
+    it('returns the analysis by id and null for an unknown id', async () => {
+      const target = analyses[0];
+      if (!target) throw new Error('missing fixture');
+
+      const found = await new AnalysisRepository().findById(target._id);
+      expect(String(found?._id)).toBe(String(target._id));
+
+      expect(await new AnalysisRepository().findById(USER2_ID)).toBeNull();
+    });
+  });
 });
 
 describe('RecommendationRepository (fixture reuse)', () => {

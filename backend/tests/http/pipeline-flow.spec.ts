@@ -11,6 +11,7 @@ import {
   Project,
   User,
   type AnalysisDocument,
+  type DeploymentPlanDocument,
   type ProjectDocument,
   type UserDocument,
 } from '../../src/models/entities/index.js';
@@ -101,6 +102,7 @@ beforeEach(async () => {
   analysis = await (await Analysis.request({ project, userId: owner._id })).start();
   analysis = await analysis.complete({
     detectedFiles: ['src/index.ts'],
+    components: [{ name: 'api', type: 'BACKEND', rootPath: '.' }],
     docker: { hasDockerfile: true, hasCompose: false, findings: [] },
   });
 });
@@ -197,6 +199,56 @@ describe('pipeline flow', () => {
       .get(`/api/v1/plans/${plan.id}`)
       .set('Authorization', `Bearer ${token}`);
     expect(supersededSource.body.data.status).toBe('SUPERSEDED');
+  });
+
+  it('drafts plan v1 from a completed analysis over HTTP', async () => {
+    const created = await request(application)
+      .post('/api/v1/plans')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ projectId: String(project._id), analysisId: String(analysis._id) });
+
+    expect(created.status).toBe(201);
+    expect(created.body.data).toMatchObject({ status: 'DRAFT', version: 1 });
+    expect(created.body.data.components[0]).toMatchObject({
+      name: 'api',
+      containerPort: 3000,
+      replicas: 2,
+    });
+
+    const listed = await request(application)
+      .get('/api/v1/plans')
+      .set('Authorization', `Bearer ${token}`);
+    expect(listed.status).toBe(200);
+    expect(listed.body.data[0]).toMatchObject({ status: 'DRAFT', version: 1 });
+
+    const again = await request(application)
+      .post('/api/v1/plans')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ projectId: String(project._id), analysisId: String(analysis._id) });
+    expect(again.status).toBe(201);
+    expect(again.body.data.version).toBe(2);
+  });
+
+  it('refuses drafts from a pending analysis and a foreign project', async () => {
+    const pending = await Analysis.request({ project, userId: owner._id });
+
+    const notCompleted = await request(application)
+      .post('/api/v1/plans')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ projectId: String(project._id), analysisId: String(pending._id) });
+    expect(notCompleted.status).toBe(409);
+
+    const strangerProject = await Project.createFor({
+      ownerId: (await User.findOne({ email: OTHER.email }))!._id,
+      name: 'other proj',
+      description: 'd',
+    });
+
+    const foreign = await request(application)
+      .post('/api/v1/plans')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ projectId: String(strangerProject._id), analysisId: String(analysis._id) });
+    expect(foreign.status).toBe(404);
   });
 
   it('rejects a draft only with a reason', async () => {

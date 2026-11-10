@@ -124,4 +124,66 @@ describe("analyses board", () => {
 
     expect(await screen.findByText("#prj_1")).toBeTruthy();
   });
+
+  it("drafts the plan v1 from a COMPLETED row and confirms through a toast", async () => {
+    const fetchMock = stubPipelineEndpoints([
+      listHandler("analyses", [ANALYSIS_ROW]),
+      listHandler("projects", [PROJECT_ROW]),
+      {
+        match: (method, path) => method === "POST" && path.endsWith("/plans"),
+        payload: () => ({ message: "created", data: { id: "pln_9", status: "DRAFT" } }),
+        status: 201,
+      },
+    ]);
+    grantSession();
+    renderBoard(<AnalysesBoard />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /Draft plan/ }));
+
+    expect(await screen.findByText("Plan draft created")).toBeTruthy();
+
+    const draftCall = callsOf(fetchMock).find(
+      (call) => call.method === "POST" && call.path.endsWith("/plans"),
+    );
+    expect(draftCall).toBeTruthy();
+    const body = JSON.parse(
+      await (fetchMock.mock.calls[draftCall!.index][0] as Request).clone().text(),
+    );
+    expect(body).toEqual({ projectId: "prj_1", analysisId: "ana_1" });
+  });
+
+  it("reports a failed draft through the failed toast with the server message", async () => {
+    stubPipelineEndpoints([
+      listHandler("analyses", [ANALYSIS_ROW]),
+      listHandler("projects", [PROJECT_ROW]),
+      {
+        match: (method, path) => method === "POST" && path.endsWith("/plans"),
+        payload: () => ({
+          error: { code: "CONFLICT", message: "Only a completed analysis can produce a plan draft" },
+        }),
+        status: 409,
+      },
+    ]);
+    grantSession();
+    renderBoard(<AnalysesBoard />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /Draft plan/ }));
+
+    expect(await screen.findByText("Action failed")).toBeTruthy();
+    expect(
+      await screen.findByText("Only a completed analysis can produce a plan draft"),
+    ).toBeTruthy();
+  });
+
+  it("offers no action while the analysis is still moving", async () => {
+    stubPipelineEndpoints([
+      listHandler("analyses", [{ ...ANALYSIS_ROW, id: "ana_2", status: "RUNNING", number: 8 }]),
+      listHandler("projects", [PROJECT_ROW]),
+    ]);
+    grantSession();
+    renderBoard(<AnalysesBoard />);
+
+    await screen.findByText("RUNNING");
+    expect(screen.queryByRole("button", { name: /Draft plan/ })).toBeNull();
+  });
 });

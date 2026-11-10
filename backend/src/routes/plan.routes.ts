@@ -3,6 +3,7 @@ import { Router, type RequestHandler } from 'express';
 import {
   createApprovePlanHandler,
   createDeployPlanHandler,
+  createDraftPlanHandler,
   createGetPlanHandler,
   createListPlansHandler,
   createRejectPlanHandler,
@@ -18,6 +19,7 @@ export function createPlanRouter(
 
   router.get('/', requireAuth, createListPlansHandler(planService));
   router.get('/:planId', requireAuth, createGetPlanHandler(planService));
+  router.post('/', requireAuth, createDraftPlanHandler(planService));
   router.post('/:planId/approve', requireAuth, createApprovePlanHandler(planService));
   router.post('/:planId/reject', requireAuth, createRejectPlanHandler(planService));
   router.post('/:planId/revisions', requireAuth, createRevisePlanHandler(planService));

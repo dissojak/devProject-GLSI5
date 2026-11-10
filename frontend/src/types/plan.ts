@@ -67,6 +67,11 @@ export interface PlanResponse {
   data: DeploymentPlan;
 }
 
+export interface DraftPlanBody {
+  projectId: string;
+  analysisId: string;
+}
+
 export interface RejectPlanBody {
   reason: string;
 }

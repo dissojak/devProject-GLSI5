@@ -1,5 +1,4 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { Types } from 'mongoose';
 
 import {
   Analysis,
@@ -8,7 +7,6 @@ import {
   Project,
   User,
   type AnalysisDocument,
-  type DeploymentDocument,
   type DeploymentPlanDocument,
   type ProjectDocument,
   type UserDocument,
@@ -16,9 +14,9 @@ import {
 import {
   AuditLogRepository,
   DeploymentRepository,
-  PlanRepository,
   ProjectRepository,
 } from '../../src/repositories/index.js';
+import type { ProjectEnvironment } from '../../src/domain/enums/project.enums.js';
 import { InvalidStateTransitionError, NotFoundError } from '../../src/domain/errors/index.js';
 import { createDeploymentService } from '../../src/services/deployments/deployment.service.js';
 import { connectTestingModule, disconnectTestingModule } from '../integration/test-database.js';
@@ -44,7 +42,7 @@ let plan: DeploymentPlanDocument;
 let deployments: DeploymentRepository;
 let service: ReturnType<typeof createDeploymentService>;
 
-async function seededDeployment(environment: 'DEVELOPMENT' | 'PRODUCTION' = 'PRODUCTION') {
+async function seededDeployment(environment: ProjectEnvironment = 'PRODUCTION') {
   seededDeployments += 1;
   const draft = await DeploymentPlan.draft({
     projectId: project._id,

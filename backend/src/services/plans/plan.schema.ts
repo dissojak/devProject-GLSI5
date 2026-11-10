@@ -16,10 +16,16 @@ export const rejectPlanBodySchema = z.strictObject({
   reason: z.string().trim().min(1),
 });
 
+export const draftPlanBodySchema = z.strictObject({
+  projectId: hexIdSchema,
+  analysisId: hexIdSchema,
+});
+
 export const deployPlanBodySchema = z.strictObject({
   environment: z.enum(PROJECT_ENVIRONMENTS),
 });
 
 export type ListPlansQuery = z.infer<typeof listPlansQuerySchema>;
 export type RejectPlanBody = z.infer<typeof rejectPlanBodySchema>;
+export type DraftPlanBody = z.infer<typeof draftPlanBodySchema>;
 export type DeployPlanBody = z.infer<typeof deployPlanBodySchema>;

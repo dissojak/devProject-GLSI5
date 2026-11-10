@@ -23,6 +23,13 @@ export interface PipelineColumnRow {
   label: string;
 }
 
+/** A row-level action (label + icon + button variant); registries map status → row | null. */
+export interface StatusActionRow {
+  label: string;
+  icon: MaterialIconName;
+  variant: "primary" | "champagne" | "teal" | "crimson" | "mint";
+}
+
 export interface PipelineEmptyRow {
   icon: MaterialIconName;
   heading: string;

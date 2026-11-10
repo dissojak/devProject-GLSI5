@@ -42,6 +42,11 @@ const RawEnvSchema = z.object({
     .string()
     .trim()
     .url('N8N_AI_AUDIT_WEBHOOK_URL must be a valid URL'),
+  N8N_DEPLOYMENT_WEBHOOK_URL: z
+    .string()
+    .trim()
+    .url('N8N_DEPLOYMENT_WEBHOOK_URL must be a valid URL')
+    .optional(),
 });
 
 export type Env = {
@@ -59,6 +64,7 @@ export type Env = {
   n8nAnalysisWebhookUrl: string;
   n8nSharedSecret: string;
   n8nAiAuditWebhookUrl: string;
+  n8nDeploymentWebhookUrl: string;
 };
 
 let cachedEnv: Env | undefined;
@@ -106,6 +112,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     n8nAnalysisWebhookUrl: parsed.data.N8N_ANALYSIS_WEBHOOK_URL,
     n8nSharedSecret: parsed.data.N8N_SHARED_SECRET,
     n8nAiAuditWebhookUrl: parsed.data.N8N_AI_AUDIT_WEBHOOK_URL,
+    n8nDeploymentWebhookUrl: parsed.data.N8N_DEPLOYMENT_WEBHOOK_URL ?? '',
   };
 }
 

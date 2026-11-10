@@ -8,12 +8,23 @@ import {
   ANALYSES_TABLE_COLUMNS,
   ANALYSES_TECH_PREVIEW_COUNT,
   ANALYSIS_LIVE_STATUS,
+  ANALYSIS_ROW_ACTIONS,
   ANALYSIS_STATUS_CHIPS,
 } from "@/data/analyses-board";
 import { PROJECTS_ROUTE } from "@/data/dashboard";
+import { Button } from "@/shared/button";
+import { MaterialIcon } from "@/shared/material-icon";
 import { formatPipelineDuration, pipelineProjectFallback } from "@/utils/pipeline-view";
 import { relativeTime } from "@/utils/relative-time";
 import type { Analysis } from "@/types/analysis";
+
+interface AnalysesTableProps {
+  rows: Analysis[];
+  projectNames: Map<string, string>;
+  /** The analysis mid-draft, if any; every other action button waits. */
+  busyId: string | null;
+  onDraft: (projectId: string, analysisId: string) => void;
+}
 
 function TechnologiesCell({ analysis }: { analysis: Analysis }) {
   const shown = analysis.technologies.slice(0, ANALYSES_TECH_PREVIEW_COUNT);
@@ -36,16 +47,10 @@ function TechnologiesCell({ analysis }: { analysis: Analysis }) {
   );
 }
 
-export function AnalysesTable({
-  rows,
-  projectNames,
-}: {
-  rows: Analysis[];
-  projectNames: Map<string, string>;
-}) {
+export function AnalysesTable({ rows, projectNames, busyId, onDraft }: AnalysesTableProps) {
   return (
     <div className="overflow-x-auto rounded-2xl border border-steel/50 bg-panel/50 shadow-md">
-      <table className="w-full min-w-[760px] border-collapse text-left">
+      <table className="w-full min-w-[860px] border-collapse text-left">
         <thead>
           <tr className="border-b border-steel/30 bg-basin/60">
             {ANALYSES_TABLE_COLUMNS.map((column) => (
@@ -60,41 +65,58 @@ export function AnalysesTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, index) => (
-            <motion.tr
-              key={row.id}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: index * 0.03 }}
-              className="border-b border-steel/20 transition-colors last:border-b-0 hover:bg-basin/40"
-            >
-              <td className="px-4 py-3 font-mono text-code-md text-foam">#{row.number}</td>
-              <td className="px-4 py-3">
-                <Link
-                  href={`${PROJECTS_ROUTE.href}/${row.project}`}
-                  className="font-display text-body-sm text-ice hover:underline"
-                >
-                  {projectNames.get(row.project) ?? pipelineProjectFallback(row.project)}
-                </Link>
-              </td>
-              <td className="px-4 py-3">
-                <PipelineStatusChip
-                  chip={ANALYSIS_STATUS_CHIPS[row.status]}
-                  live={ANALYSIS_LIVE_STATUS[row.status]}
-                />
-              </td>
-              <td className="px-4 py-3 font-mono text-code-md text-mist">{row.branch}</td>
-              <td className="px-4 py-3">
-                <TechnologiesCell analysis={row} />
-              </td>
-              <td className="px-4 py-3 font-mono text-code-md text-mist">
-                {formatPipelineDuration(row.durationMs)}
-              </td>
-              <td className="px-4 py-3 font-mono text-label-sm text-mist">
-                {relativeTime(row.startedAt ?? row.createdAt)}
-              </td>
-            </motion.tr>
-          ))}
+          {rows.map((row, index) => {
+            const action = ANALYSIS_ROW_ACTIONS[row.status];
+
+            return (
+              <motion.tr
+                key={row.id}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: index * 0.03 }}
+                className="border-b border-steel/20 transition-colors last:border-b-0 hover:bg-basin/40"
+              >
+                <td className="px-4 py-3 font-mono text-code-md text-foam">#{row.number}</td>
+                <td className="px-4 py-3">
+                  <Link
+                    href={`${PROJECTS_ROUTE.href}/${row.project}`}
+                    className="font-display text-body-sm text-ice hover:underline"
+                  >
+                    {projectNames.get(row.project) ?? pipelineProjectFallback(row.project)}
+                  </Link>
+                </td>
+                <td className="px-4 py-3">
+                  <PipelineStatusChip
+                    chip={ANALYSIS_STATUS_CHIPS[row.status]}
+                    live={ANALYSIS_LIVE_STATUS[row.status]}
+                  />
+                </td>
+                <td className="px-4 py-3 font-mono text-code-md text-mist">{row.branch}</td>
+                <td className="px-4 py-3">
+                  <TechnologiesCell analysis={row} />
+                </td>
+                <td className="px-4 py-3 font-mono text-code-md text-mist">
+                  {formatPipelineDuration(row.durationMs)}
+                </td>
+                <td className="px-4 py-3 font-mono text-label-sm text-mist">
+                  {relativeTime(row.startedAt ?? row.createdAt)}
+                </td>
+                <td className="px-4 py-3">
+                  {action ? (
+                    <Button
+                      variant={action.variant}
+                      disabled={busyId !== null}
+                      aria-busy={busyId === row.id}
+                      onClick={() => onDraft(row.project, row.id)}
+                    >
+                      <MaterialIcon name={action.icon} className="text-[18px]" />
+                      {action.label}
+                    </Button>
+                  ) : null}
+                </td>
+              </motion.tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
