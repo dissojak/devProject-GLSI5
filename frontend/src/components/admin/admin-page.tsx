@@ -1,9 +1,14 @@
 "use client";
 
-import { useState } from "react";
 import { MotionConfig, motion } from "motion/react";
+import { useMemo, useState } from "react";
 import { useToast } from "@/components/toast/toast-provider";
 import { AdminGuard } from "@/components/admin/admin-guard";
+import { AdminPendingContent } from "@/components/admin/admin-pending-content";
+import { AdminUsersContent } from "@/components/admin/admin-users-content";
+import { AdminEditUserPanel } from "@/components/admin/admin-edit-user-panel";
+import { AdminChangeRoleModal } from "@/components/admin/admin-change-role-modal";
+import { AdminStatusModal } from "@/components/admin/admin-status-modal";
 import {
   useListPendingUsersQuery,
   useApproveUserMutation,
@@ -11,18 +16,38 @@ import {
   useListUsersQuery,
   useDeactivateUserMutation,
   useReactivateUserMutation,
+  useUpdateUserMutation,
+  useChangeUserRoleMutation,
 } from "@/store/admin-api";
-import type { AdminUser, PendingUser, AccountStatus } from "@/types/admin";
+import {
+  ADMIN_PAGE_HEADER_ROW,
+  ADMIN_PENDING_STAT_ROW,
+  ADMIN_SYNC_ROW,
+  ADMIN_TABS,
+  ADMIN_TOTAL_STAT_ROW,
+} from "@/data/admin";
+import type {
+  AdminMenuActionId,
+  AdminStatusModalMode,
+  AdminTabId,
+  AdminUser,
+  PendingUser,
+  UserRole,
+} from "@/types/admin";
+import type { MaterialIconName } from "@/types/icons";
+import { useAuthSession } from "@/hooks/use-auth-session";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { MaterialIcon } from "@/shared/material-icon";
-import { Button } from "@/shared/button";
 import { cn } from "@/utils/class-names";
 
-const STATUS_CLASSES: Record<AccountStatus, string> = {
-  PENDING: "bg-champagne/15 text-champagne",
-  ACTIVE: "bg-mint/15 text-mint",
-  REJECTED: "bg-crimson/15 text-crimson",
-  DISABLED: "bg-mist/15 text-mist",
-};
+interface ErrorBody {
+  data?: { error?: { message?: string } };
+}
+
+function backendMessage(error: unknown): string {
+  const body = error as ErrorBody;
+  return body?.data?.error?.message ?? "Try again.";
+}
 
 export function AdminPage() {
   return (
@@ -33,424 +58,325 @@ export function AdminPage() {
 }
 
 function AdminPageInner() {
+  const { user } = useAuthSession();
+  const selfId = user?.id ?? "";
   const toast = useToast();
-  const [tab, setTab] = useState<"pending" | "users">("pending");
+
+  const [tab, setTab] = useState<AdminTabId>("pending");
   const [query, setQuery] = useState("");
-  const [roleFilter, setRoleFilter] = useState<string>("");
+  const debouncedQuery = useDebouncedValue(query);
+  const [roleFilter, setRoleFilter] = useState("");
+  const [includeDeleted, setIncludeDeleted] = useState(false);
   const [page, setPage] = useState(1);
+  const [menuUserId, setMenuUserId] = useState<string | null>(null);
+  const [editTarget, setEditTarget] = useState<AdminUser | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [roleTarget, setRoleTarget] = useState<AdminUser | null>(null);
+  const [roleSaving, setRoleSaving] = useState(false);
+  const [roleError, setRoleError] = useState<string | null>(null);
+  const [statusTarget, setStatusTarget] = useState<{ user: AdminUser; mode: AdminStatusModalMode } | null>(null);
 
   const pendingQuery = useListPendingUsersQuery();
   const usersQuery = useListUsersQuery({
-    q: query || undefined,
+    q: debouncedQuery || undefined,
     role: roleFilter || undefined,
+    includeDeleted,
     page,
     limit: 20,
   });
 
-  const [approve, approveMeta] = useApproveUserMutation();
-  const [reject, rejectMeta] = useRejectUserMutation();
-  const [deactivate, deactivateMeta] = useDeactivateUserMutation();
-  const [reactivate, reactivateMeta] = useReactivateUserMutation();
+  const [approveUser, approveMeta] = useApproveUserMutation();
+  const [rejectUser, rejectMeta] = useRejectUserMutation();
+  const [deactivateUser, deactivateMeta] = useDeactivateUserMutation();
+  const [reactivateUser, reactivateMeta] = useReactivateUserMutation();
+  const [updateUser] = useUpdateUserMutation();
+  const [changeUserRole] = useChangeUserRoleMutation();
 
-  const pending = pendingQuery.data?.data ?? [];
-  const users = usersQuery.data?.data ?? [];
+  const pending = useMemo(() => pendingQuery.data?.data ?? [], [pendingQuery.data]);
+  const users = useMemo(() => usersQuery.data?.data ?? [], [usersQuery.data]);
   const pagination = usersQuery.data?.pagination;
-
-  const totalUsers = pagination?.total ?? users.length;
-  const activeCount = users.filter((u) => u.status === "ACTIVE").length;
-  const rejectedCount = users.filter((u) => u.status === "REJECTED").length;
   const pendingCount = pending.length;
+  const totalUsers = pagination?.total ?? users.length;
+
+  const sortedPending = useMemo(
+    () =>
+      [...pending].sort(
+        (first, second) => (second.createdAt ?? "").localeCompare(first.createdAt ?? ""),
+      ),
+    [pending],
+  );
 
   async function handleApprove(user: PendingUser) {
     try {
-      await approve({ id: user.id }).unwrap();
+      await approveUser({ id: user.id }).unwrap();
       toast.push({ tone: "mint", title: "Approved", message: `${user.name} can now sign in.` });
-    } catch (err) {
-      const e = err as { data?: { error?: { message?: string } } };
-      toast.push({ tone: "crimson", title: "Approve failed", message: e?.data?.error?.message ?? "Try again." });
+    } catch (error) {
+      toast.push({ tone: "crimson", title: "Approve failed", message: backendMessage(error) });
     }
   }
+
   async function handleReject(user: PendingUser) {
     try {
-      await reject({ id: user.id }).unwrap();
+      await rejectUser({ id: user.id }).unwrap();
       toast.push({ tone: "champagne", title: "Rejected", message: `${user.name}'s registration was rejected.` });
-    } catch (err) {
-      const e = err as { data?: { error?: { message?: string } } };
-      toast.push({ tone: "crimson", title: "Reject failed", message: e?.data?.error?.message ?? "Try again." });
+    } catch (error) {
+      toast.push({ tone: "crimson", title: "Reject failed", message: backendMessage(error) });
     }
   }
-  async function handleDeactivate(user: AdminUser) {
+
+  async function handleSaveEdit(name: string) {
+    if (!editTarget) {
+      return;
+    }
+    setEditSaving(true);
+    setEditError(null);
     try {
-      await deactivate({ id: user.id }).unwrap();
-      toast.push({ tone: "champagne", title: "Deactivated", message: `${user.name} can no longer sign in.` });
-    } catch (err) {
-      const e = err as { data?: { error?: { message?: string } } };
-      toast.push({ tone: "crimson", title: "Deactivate failed", message: e?.data?.error?.message ?? "Try again." });
+      await updateUser({ id: editTarget.id, name }).unwrap();
+      toast.push({ tone: "mint", title: "Saved", message: `${editTarget.name}'s profile was updated.` });
+      setEditTarget(null);
+    } catch (error) {
+      setEditError(backendMessage(error));
+    } finally {
+      setEditSaving(false);
     }
   }
-  async function handleReactivate(user: AdminUser) {
-    try {
-      await reactivate({ id: user.id }).unwrap();
-      toast.push({ tone: "mint", title: "Reactivated", message: `${user.name} can sign in again.` });
-    } catch (err) {
-      const e = err as { data?: { error?: { message?: string } } };
-      toast.push({ tone: "crimson", title: "Reactivate failed", message: e?.data?.error?.message ?? "Try again." });
+
+  async function handleChangeRole(role: UserRole) {
+    if (!roleTarget) {
+      return;
     }
+    setRoleSaving(true);
+    setRoleError(null);
+    try {
+      await changeUserRole({ id: roleTarget.id, role }).unwrap();
+      toast.push({ tone: "mint", title: "Role updated", message: `${roleTarget.name} is now a ${role === "ADMIN" ? "administrator" : "developer"}.` });
+      setRoleTarget(null);
+    } catch (error) {
+      setRoleError(backendMessage(error));
+    } finally {
+      setRoleSaving(false);
+    }
+  }
+
+  async function handleStatusConfirm() {
+    if (!statusTarget) {
+      return;
+    }
+    const { user: target, mode } = statusTarget;
+    try {
+      if (mode === "deactivate") {
+        await deactivateUser({ id: target.id }).unwrap();
+        toast.push({ tone: "champagne", title: "Deactivated", message: `${target.name} can no longer sign in.` });
+      } else {
+        await reactivateUser({ id: target.id }).unwrap();
+        toast.push({ tone: "mint", title: "Reactivated", message: `${target.name} can sign in again.` });
+      }
+      setStatusTarget(null);
+    } catch (error) {
+      toast.push({ tone: "crimson", title: "Operation failed", message: backendMessage(error) });
+      setStatusTarget(null);
+    }
+  }
+
+  const menuActionHandlers: Record<AdminMenuActionId, (user: AdminUser) => void> = {
+    edit: (user) => setEditTarget(user),
+    role: (user) => setRoleTarget(user),
+    deactivate: (user) => setStatusTarget({ user, mode: "deactivate" }),
+    reactivate: (user) => setStatusTarget({ user, mode: "reactivate" }),
+  };
+
+  function handleMenuAction(action: AdminMenuActionId, user: AdminUser) {
+    setMenuUserId(null);
+    menuActionHandlers[action](user);
+  }
+
+  if (!selfId) {
+    return null;
   }
 
   return (
     <MotionConfig reducedMotion="user">
       <div className="flex w-full flex-col gap-6 p-8">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-mist/60">
-              <span>DeploymentPlanner AI</span>
-              <span className="text-steel">/</span>
-              <span className="text-mist">Administration</span>
+        <div className="flex flex-wrap items-start justify-between gap-6">
+          <div className="max-w-[520px]">
+            <div className="flex items-center gap-2 font-mono text-label-sm uppercase tracking-widest text-teal">
+              <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-tide shadow-tide-dot" />
+              {ADMIN_PAGE_HEADER_ROW.kicker}
             </div>
-            <h1 className="mt-2 font-display text-headline-lg font-bold tracking-tight text-foam">
-              Administration
+            <h1 className="mt-2 font-display text-display-sm font-bold tracking-tight text-frost">
+              {ADMIN_PAGE_HEADER_ROW.title}
             </h1>
             <p className="mt-1 font-display text-body-md text-mist">
-              Approve new accounts and manage platform users.
+              {ADMIN_PAGE_HEADER_ROW.subtitle}
             </p>
           </div>
-          <button
-            type="button"
-            className="flex items-center gap-2 rounded-full bg-ice px-5 py-2.5 font-display text-body-md font-semibold text-navy shadow-ice-submit hover:shadow-ice-halo"
-          >
-            <MaterialIcon name="person_add" className="text-[18px]" />
-            Invite user
-          </button>
+          <div className="grid grid-cols-2 gap-4">
+            <AdminStatCard
+              label={ADMIN_PENDING_STAT_ROW.label}
+              value={pendingCount}
+              unit={ADMIN_PENDING_STAT_ROW.unit}
+              hint={ADMIN_PENDING_STAT_ROW.hint}
+              icon={ADMIN_PENDING_STAT_ROW.icon}
+              valueClasses="text-champagne"
+              iconClasses="text-champagne"
+            />
+            <AdminStatCard
+              label={ADMIN_TOTAL_STAT_ROW.label}
+              value={totalUsers}
+              unit={ADMIN_TOTAL_STAT_ROW.unit}
+              hint={`${pendingCount} ${ADMIN_TOTAL_STAT_ROW.hintSuffix}`}
+              icon={ADMIN_TOTAL_STAT_ROW.icon}
+              valueClasses="text-foam"
+              iconClasses="text-teal"
+            />
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <StatCard label="Pending approvals" value={pendingCount} hint="Action required" tone="champagne" />
-          <StatCard label="Total users" value={totalUsers} hint={`${activeCount} active · ${rejectedCount} rejected · ${pendingCount} pending`} tone="ice" />
-          <StatCard label="Workspace core" value={totalUsers} hint="All registered accounts" tone="mist" />
-        </div>
-
-        <div className="flex items-center gap-1 border-b border-steel/40">
-          {(["pending", "users"] as const).map((t) => (
+        <div className="flex items-end gap-1 border-b border-steel/40">
+          {ADMIN_TABS.map((row) => (
             <button
-              key={t}
+              key={row.id}
               type="button"
-              onClick={() => setTab(t)}
+              onClick={() => setTab(row.id)}
+              aria-current={tab === row.id ? "page" : undefined}
               className={cn(
-                "relative px-4 py-2.5 font-display text-body-md transition-colors",
-                tab === t ? "text-foam" : "text-mist hover:text-foam",
+                "relative px-4 py-3 font-display text-body-md transition-colors",
+                tab === row.id ? "font-semibold text-frost" : "text-mist hover:text-foam",
               )}
             >
-              {t === "pending" ? "Pending approvals" : "All users"}
-              <span className="ml-2 rounded-full bg-surface-high px-2 py-0.5 font-mono text-label-sm text-mist">
-                {t === "pending" ? pendingCount : totalUsers}
+              {row.label}
+              <span
+                className={cn(
+                  "ml-2 rounded-full px-2 py-0.5 font-mono text-label-sm",
+                  tab === row.id ? "bg-ice/15 text-ice" : "bg-surface-high text-mist",
+                )}
+              >
+                {row.id === "pending" ? pendingCount : totalUsers}
               </span>
-              {tab === t ? (
+              {tab === row.id ? (
                 <motion.span
                   layoutId="admin-tab-underline"
-                  className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-ice"
+                  className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-tide"
                 />
               ) : null}
             </button>
           ))}
+          {tab === "users" ? (
+            <div className="mb-1 ml-auto flex items-center gap-2 font-mono text-label-sm uppercase tracking-wider text-teal">
+              <MaterialIcon name="sync" className="text-[16px]" />
+              {ADMIN_SYNC_ROW.label}
+            </div>
+          ) : null}
         </div>
 
         {tab === "pending" ? (
-          <PendingSection
-            pending={pending}
+          <AdminPendingContent
+            pending={sortedPending}
+            selfId={selfId}
             loading={pendingQuery.isLoading}
             error={pendingQuery.isError}
             onRetry={() => pendingQuery.refetch()}
+            busy={isAdminBusy(approveMeta, rejectMeta)}
             onApprove={handleApprove}
             onReject={handleReject}
-            busy={approveMeta.isLoading || rejectMeta.isLoading}
           />
         ) : (
-          <UsersSection
+          <AdminUsersContent
             users={users}
             loading={usersQuery.isLoading}
             error={usersQuery.isError}
             onRetry={() => usersQuery.refetch()}
             query={query}
-            onQuery={setQuery}
+            onQuery={(value) => {
+              setQuery(value);
+              setPage(1);
+            }}
             roleFilter={roleFilter}
-            onRoleFilter={setRoleFilter}
+            onRoleFilter={(value) => {
+              setRoleFilter(value);
+              setPage(1);
+            }}
+            includeDeleted={includeDeleted}
+            onIncludeDeleted={(value) => {
+              setIncludeDeleted(value);
+              setPage(1);
+            }}
             pagination={pagination}
             page={page}
             onPage={setPage}
-            onDeactivate={handleDeactivate}
-            onReactivate={handleReactivate}
-            busy={deactivateMeta.isLoading || reactivateMeta.isLoading}
+            selfId={selfId}
+            menuUserId={menuUserId}
+            onMenuUserChange={setMenuUserId}
+            onMenuAction={handleMenuAction}
           />
         )}
-
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <RecentActions />
-          <StatusLegend />
-        </div>
       </div>
+
+      <AdminEditUserPanel
+        user={editTarget}
+        saving={editSaving}
+        error={editError}
+        onClose={() => {
+          setEditTarget(null);
+          setEditError(null);
+        }}
+        onSave={handleSaveEdit}
+      />
+      <AdminChangeRoleModal
+        user={roleTarget}
+        saving={roleSaving}
+        error={roleError}
+        onDismissError={() => setRoleError(null)}
+        onClose={() => {
+          setRoleTarget(null);
+          setRoleError(null);
+        }}
+        onSubmit={handleChangeRole}
+      />
+      <AdminStatusModal
+        mode={statusTarget?.mode ?? null}
+        user={statusTarget?.user ?? null}
+        saving={isAdminBusy(deactivateMeta, reactivateMeta)}
+        onClose={() => setStatusTarget(null)}
+        onConfirm={handleStatusConfirm}
+      />
     </MotionConfig>
   );
 }
 
-function StatCard({ label, value, hint, tone }: { label: string; value: number; hint: string; tone: "champagne" | "ice" | "mist" }) {
-  const classes =
-    tone === "champagne" ? "text-champagne" : tone === "ice" ? "text-ice" : "text-mist";
-  return (
-    <div className="flex flex-col gap-2 rounded-2xl border border-steel bg-panel p-5 shadow-md">
-      <span className="font-mono text-label-sm uppercase text-cinder">{label}</span>
-      <span className={cn("font-display text-headline-lg font-bold", classes)}>{value}</span>
-      <span className="font-display text-body-sm text-mist">{hint}</span>
-    </div>
-  );
+function isAdminBusy(...metas: Array<{ isLoading: boolean }>): boolean {
+  return metas.some((meta) => meta.isLoading);
 }
 
-function PendingSection({
-  pending,
-  loading,
-  error,
-  onRetry,
-  onApprove,
-  onReject,
-  busy,
+function AdminStatCard({
+  label,
+  value,
+  unit,
+  hint,
+  icon,
+  valueClasses,
+  iconClasses,
 }: {
-  pending: PendingUser[];
-  loading: boolean;
-  error: boolean;
-  onRetry: () => void;
-  onApprove: (u: PendingUser) => void;
-  onReject: (u: PendingUser) => void;
-  busy: boolean;
+  label: string;
+  value: number;
+  unit: string;
+  hint: string;
+  icon: MaterialIconName;
+  valueClasses: string;
+  iconClasses: string;
 }) {
-  if (loading) return <p className="font-display text-body-md text-mist">Loading pending approvals…</p>;
-  if (error) return <ErrorBlock message="Could not load pending approvals." onRetry={onRetry} />;
-  if (pending.length === 0) {
-    return (
-      <div className="rounded-2xl border border-steel bg-panel p-8 text-center">
-        <MaterialIcon name="done_all" className="text-[32px] text-mint" />
-        <p className="mt-2 font-display text-body-md text-mist">No pending approvals. You are all caught up.</p>
+  return (
+    <div className="w-[240px] rounded-2xl border border-steel/70 bg-panel/70 p-5 shadow-md backdrop-blur-sm">
+      <div className="flex items-start justify-between gap-3">
+        <span className="font-mono text-label-sm uppercase tracking-wider text-cinder">{label}</span>
+        <MaterialIcon name={icon} className={cn("text-[20px]", iconClasses)} />
       </div>
-    );
-  }
-  return (
-    <div className="flex flex-col gap-3">
-      {pending.map((user) => (
-        <motion.div
-          key={user.id}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col gap-3 rounded-2xl border border-steel bg-panel p-5 shadow-md"
-        >
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-high font-display text-body-md font-bold text-foam">
-                {initials(user.name)}
-              </div>
-              <div>
-                <p className="font-display text-body-md font-semibold text-foam">{user.name}</p>
-                <p className="font-mono text-label-sm text-mist">{user.email}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="rounded-full bg-surface-high px-2.5 py-0.5 font-mono text-label-sm text-mist">
-                {user.role}
-              </span>
-              <span className={cn("rounded-full px-2.5 py-0.5 font-mono text-label-sm uppercase", STATUS_CLASSES[user.status])}>
-                {user.status}
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button onClick={() => onApprove(user)} disabled={busy} className="h-8 gap-2 px-4">
-              <MaterialIcon name="check" className="text-[14px]" />
-              Approve
-            </Button>
-            <Button variant="champagne" onClick={() => onReject(user)} disabled={busy} className="h-8 px-4">
-              Reject
-            </Button>
-          </div>
-        </motion.div>
-      ))}
+      <p className="mt-2 flex items-baseline gap-2">
+        <span className={cn("font-display text-[34px] font-bold leading-none", valueClasses)}>{value}</span>
+        <span className="font-mono text-label-sm uppercase tracking-wider text-mist">{unit}</span>
+      </p>
+      <p className="mt-2 font-display text-body-sm text-mist">{hint}</p>
     </div>
   );
-}
-
-function UsersSection({
-  users,
-  loading,
-  error,
-  onRetry,
-  query,
-  onQuery,
-  roleFilter,
-  onRoleFilter,
-  pagination,
-  page,
-  onPage,
-  onDeactivate,
-  onReactivate,
-  busy,
-}: {
-  users: AdminUser[];
-  loading: boolean;
-  error: boolean;
-  onRetry: () => void;
-  query: string;
-  onQuery: (v: string) => void;
-  roleFilter: string;
-  onRoleFilter: (v: string) => void;
-  pagination: { page: number; limit: number; total: number; pageCount: number } | undefined;
-  page: number;
-  onPage: (p: number) => void;
-  onDeactivate: (u: AdminUser) => void;
-  onReactivate: (u: AdminUser) => void;
-  busy: boolean;
-}) {
-  if (loading) return <p className="font-display text-body-md text-mist">Loading users…</p>;
-  if (error) return <ErrorBlock message="Could not load users." onRetry={onRetry} />;
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => onQuery(e.target.value)}
-          placeholder="Search users…"
-          className="h-10 w-64 rounded-xl border border-steel bg-basin px-4 font-display text-body-md text-foam outline-none focus:border-teal"
-        />
-        <select
-          value={roleFilter}
-          onChange={(e) => onRoleFilter(e.target.value)}
-          className="h-10 rounded-xl border border-steel bg-basin px-3 font-display text-body-md text-foam"
-          aria-label="Filter by role"
-        >
-          <option value="">All roles</option>
-          <option value="DEVELOPER">Developer</option>
-          <option value="ADMIN">Administrator</option>
-        </select>
-      </div>
-      <div className="overflow-hidden rounded-2xl border border-steel bg-panel shadow-md">
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="border-b border-steel/40 bg-basin/60 text-left">
-              <th className="px-4 py-3 font-mono text-label-sm uppercase text-cinder">User</th>
-              <th className="px-4 py-3 font-mono text-label-sm uppercase text-cinder">Role</th>
-              <th className="px-4 py-3 font-mono text-label-sm uppercase text-cinder">Status</th>
-              <th className="px-4 py-3 font-mono text-label-sm uppercase text-cinder">Last login</th>
-              <th className="px-4 py-3 font-mono text-label-sm uppercase text-cinder">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((user) => (
-              <tr key={user.id} className="border-b border-steel/20 hover:bg-basin/40">
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-high font-display text-body-sm font-bold text-foam">
-                      {initials(user.name)}
-                    </div>
-                    <div>
-                      <p className="font-display text-body-md font-semibold text-foam">{user.name}</p>
-                      <p className="font-mono text-label-sm text-mist">{user.email}</p>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-4 py-3 font-mono text-code-md text-mist">{user.role}</td>
-                <td className="px-4 py-3">
-                  <span className={cn("rounded-full px-2.5 py-0.5 font-mono text-label-sm uppercase", STATUS_CLASSES[user.status])}>
-                    {user.status}
-                  </span>
-                </td>
-                <td className="px-4 py-3 font-mono text-label-sm text-mist">
-                  {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : "—"}
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    {user.isActive ? (
-                      <button
-                        type="button"
-                        onClick={() => onDeactivate(user)}
-                        disabled={busy}
-                        className="font-display text-body-sm text-crimson hover:underline disabled:opacity-50"
-                      >
-                        Deactivate
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => onReactivate(user)}
-                        disabled={busy}
-                        className="font-display text-body-sm text-mint hover:underline disabled:opacity-50"
-                      >
-                        Reactivate
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {pagination && pagination.pageCount > 1 ? (
-        <div className="flex items-center justify-center gap-2">
-          <Button variant="champagne" disabled={page <= 1} onClick={() => onPage(Math.max(1, page - 1))} className="h-9 px-4">Previous</Button>
-          <span className="font-mono text-label-sm text-mist">Page {pagination.page} of {pagination.pageCount}</span>
-          <Button variant="champagne" disabled={page >= pagination.pageCount} onClick={() => onPage(Math.min(pagination.pageCount, page + 1))} className="h-9 px-4">Next</Button>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function RecentActions() {
-  return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-steel bg-panel p-6 shadow-md">
-      <p className="font-display text-headline-sm font-bold text-foam">Recent user actions</p>
-      <p className="font-display text-body-sm text-mist">Live audit feed — endpoint not yet exposed by the backend.</p>
-    </div>
-  );
-}
-
-function StatusLegend() {
-  return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-steel bg-panel p-6 shadow-md">
-      <p className="font-display text-headline-sm font-bold text-foam">Status &amp; role legend</p>
-      <div className="flex flex-col gap-2">
-        <p className="font-mono text-label-sm uppercase text-cinder">Account statuses</p>
-        <div className="flex flex-wrap gap-2">
-          {(["PENDING", "ACTIVE", "REJECTED", "DISABLED"] as AccountStatus[]).map((s) => (
-            <span key={s} className={cn("rounded-full px-2.5 py-0.5 font-mono text-label-sm uppercase", STATUS_CLASSES[s])}>
-              {s}
-            </span>
-          ))}
-        </div>
-        <p className="mt-2 font-mono text-label-sm uppercase text-cinder">Roles</p>
-        <div className="flex flex-wrap gap-2">
-          <span className="rounded-full bg-surface-high px-2.5 py-0.5 font-mono text-label-sm text-mist">Developer</span>
-          <span className="rounded-full bg-surface-high px-2.5 py-0.5 font-mono text-label-sm text-mist">Administrator</span>
-        </div>
-        <p className="mt-2 font-mono text-label-sm uppercase text-cinder">LDAP &amp; SSO sync</p>
-        <p className="font-display text-body-sm text-mist">Connected · ms-azure-ad-01</p>
-      </div>
-    </div>
-  );
-}
-
-function ErrorBlock({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <div className="rounded-2xl border border-crimson/40 bg-crimson/10 p-6">
-      <p className="font-display text-body-md text-crimson">{message}</p>
-      <button type="button" onClick={onRetry} className="mt-2 font-display text-body-sm text-ice hover:underline">
-        Retry
-      </button>
-    </div>
-  );
-}
-
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  return parts
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
 }

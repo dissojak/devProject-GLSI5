@@ -24,8 +24,10 @@ function toUserDto(user: UserDocument) {
     name: user.name,
     email: user.email,
     role: user.role,
+    status: user.status,
     isActive: user.isActive,
     lastLoginAt: user.lastLoginAt ?? null,
+    createdAt: (user.get('createdAt') as Date).toISOString(),
   };
 }
 

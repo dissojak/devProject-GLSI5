@@ -39,9 +39,14 @@ export const authSessionSlice = createSlice({
     ) => {
       state.token = action.payload.accessToken;
       state.user = action.payload.user;
+      state.hydrated = true;
       state.expired = false;
     },
-    sessionCleared: () => initialState,
+    sessionCleared: (state) => {
+      state.token = null;
+      state.user = null;
+      state.expired = false;
+    },
     sessionRestored: (
       state,
       action: PayloadAction<StoredSession>,

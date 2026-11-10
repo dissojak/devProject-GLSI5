@@ -9,7 +9,11 @@ import { UserAvatarMenu } from "@/components/dashboard/user-avatar-menu";
 const ICON_BUTTON_BASE =
   "flex h-10 w-10 items-center justify-center rounded-full text-teal transition-colors hover:bg-panel/60 hover:text-ice disabled:cursor-default";
 
-export function DashboardTopNav() {
+interface DashboardTopNavProps {
+  crumbLabel?: string;
+}
+
+export function DashboardTopNav({ crumbLabel = DASHBOARD_CRUMB_ROW.label }: DashboardTopNavProps = {}) {
   return (
     <header className="fixed left-[260px] right-0 top-0 z-40 flex h-[72px] items-center justify-between gap-4 border-b border-ice/15 bg-navy px-6">
       <div className="flex items-center gap-3">
@@ -17,7 +21,7 @@ export function DashboardTopNav() {
           {DASHBOARD_CRUMB_ROW.brandContext}
         </span>
         <span className="text-xs text-steel">/</span>
-        <span className="text-xs font-medium text-mist">{DASHBOARD_CRUMB_ROW.label}</span>
+        <span className="text-xs font-medium text-mist">{crumbLabel}</span>
       </div>
       <div className="relative flex items-center gap-4">
         <button

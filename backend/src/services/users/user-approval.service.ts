@@ -23,6 +23,7 @@ export function createUserApprovalService(
       email: user.email,
       role: user.role,
       status: user.status,
+      createdAt: (user.get('createdAt') as Date).toISOString(),
     }));
   }
 

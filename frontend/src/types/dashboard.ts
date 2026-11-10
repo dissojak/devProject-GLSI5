@@ -44,6 +44,8 @@ export interface UserMenuItemRow {
   icon: MaterialIconName;
   href?: string;
   badge?: string;
+  /** Which live source backs the badge row; defaults to pending approvals. */
+  badgeKind?: "pending" | "myProjects";
   externalMark?: boolean;
 }
 

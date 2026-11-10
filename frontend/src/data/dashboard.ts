@@ -27,6 +27,17 @@ export const PROJECTS_ROUTE: NavLink = {
   href: "/projects",
 };
 
+export const PROFILE_ROUTE: NavLink = {
+  id: "profile",
+  label: "Profile",
+  href: "/profile",
+};
+
+/** Stands in while the live projects count is still in flight. */
+export const MY_PROJECTS_BADGE = {
+  fallback: "#0",
+} as const;
+
 export const LOGOUT_ROUTE: NavLink = {
   id: "logout",
   label: "Log out",
@@ -254,6 +265,7 @@ export const AVATAR_MENU_ADMINISTRATION_SECTION: UserMenuSectionRow = {
       label: "Pending approvals",
       icon: "how_to_reg",
       badge: ADMIN_PENDING_APPROVALS_COUNT,
+      badgeKind: "pending",
       href: "/admin",
     },
     { id: "users", label: "Users", icon: "group", href: "/admin" },
@@ -264,8 +276,15 @@ export const AVATAR_MENU_ACCOUNT_SECTION: UserMenuSectionRow = {
   id: "account",
   label: "Account",
   items: [
-    { id: "my-projects", label: "My projects", icon: "folder", href: PROJECTS_ROUTE.href },
-    { id: "profile", label: "Profile", icon: "person" },
+    {
+      id: "my-projects",
+      label: "My projects",
+      icon: "folder",
+      href: PROJECTS_ROUTE.href,
+      badgeKind: "myProjects",
+      badge: MY_PROJECTS_BADGE.fallback,
+    },
+    { id: "profile", label: "Profile", icon: "person", href: PROFILE_ROUTE.href },
     {
       id: "documentation",
       label: "Documentation",

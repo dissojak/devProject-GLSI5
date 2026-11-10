@@ -28,16 +28,26 @@ describe("authSession reducer", () => {
     });
   });
 
-  it("stores the token and user on sessionStarted", () => {
+  it("stores the token and user, and marks the tab hydrated, on sessionStarted", () => {
     expect(
       reducer(undefined, sessionStarted({ accessToken: "token-1", user: ADA })),
-    ).toEqual({ token: "token-1", user: ADA, hydrated: false, expired: false });
+    ).toEqual({ token: "token-1", user: ADA, hydrated: true, expired: false });
   });
 
-  it("clears everything on sessionCleared", () => {
+  it("clears the session on logout while keeping the tab hydrated", () => {
     expect(
       reducer({ token: "token-1", user: ADA, hydrated: true, expired: false }, sessionCleared()),
-    ).toEqual({ token: null, user: null, hydrated: false, expired: false });
+    ).toEqual({ token: null, user: null, hydrated: true, expired: false });
+  });
+
+  it("resolves the auth gate across a logout → login cycle in one tab", () => {
+    const signedIn = reducer(undefined, sessionStarted({ accessToken: "token-1", user: ADA }));
+    const loggedOut = reducer(signedIn, sessionCleared());
+    const signedInAgain = reducer(loggedOut, sessionStarted({
+      accessToken: "token-9",
+      user: ADA,
+    }));
+    expect(signedInAgain).toEqual({ token: "token-9", user: ADA, hydrated: true, expired: false });
   });
 
   it("restores a persisted session and marks the store hydrated", () => {

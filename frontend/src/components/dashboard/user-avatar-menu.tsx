@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { cn } from "@/utils/class-names";
@@ -15,6 +15,8 @@ import {
 import { AUTH_LOGIN_ROUTE } from "@/data/navigation";
 import { useAuthSession, useSessionClear } from "@/hooks/use-auth-session";
 import { useAccountLogout } from "@/hooks/use-auth-request";
+import { useListPendingUsersQuery } from "@/store/admin-api";
+import { useListProjectsQuery } from "@/store/projects-api";
 import type { UserMenuItemRow, UserMenuRoleKind, UserMenuSectionRow } from "@/types/dashboard";
 import { MaterialIcon } from "@/shared/material-icon";
 
@@ -25,7 +27,11 @@ const ROLE_PILL_BASE =
   "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] tracking-wide";
 
 const ITEM_ROW_BASE =
-  "group flex h-10 w-full items-center gap-3 rounded-xl px-3 text-sm font-medium text-foam transition-colors hover:bg-ice/[0.08] hover:text-ice focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ice/40";
+  "group flex h-10 w-full items-center gap-3 rounded-xl border border-transparent px-3 text-sm font-medium text-foam transition-colors hover:bg-ice/[0.08] hover:text-ice focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ice/40";
+
+/** Mockup 7: the row whose href matches the current path gets the ice wash. */
+const ITEM_ROW_ACTIVE =
+  "bg-ice/15 text-ice border-ice/30 shadow-sm shadow-ice/10";
 
 const SECTION_LABEL_BASE =
   "px-3 py-1 text-[10px] font-bold tracking-wider uppercase text-mist/70";
@@ -43,37 +49,90 @@ function menuRoleKind(role: string): UserMenuRoleKind {
   return "other";
 }
 
-function MenuIcon({ name }: { name: UserMenuItemRow["icon"] }) {
+function MenuIcon({ name, active }: { name: UserMenuItemRow["icon"]; active?: boolean }) {
   return (
     <MaterialIcon
       name={name}
-      className="shrink-0 text-[18px] text-teal transition-colors group-hover:text-ice"
+      className={cn(
+        "shrink-0 text-[18px] text-teal transition-colors group-hover:text-ice",
+        active && "text-ice",
+      )}
     />
   );
 }
 
 function UserMenuItem({ row, onSelect }: { row: UserMenuItemRow; onSelect: () => void }) {
+  const pathname = usePathname();
+  const active = row.href !== undefined && pathname === row.href;
+  const activeClasses = active ? ITEM_ROW_ACTIVE : null;
+  const icon = <MenuIcon name={row.icon} active={active} />;
+  const label = (
+    <span className={cn("truncate", active && "font-semibold tracking-tight")}>{row.label}</span>
+  );
+  const activeDot = active ? (
+    <span aria-hidden="true" className="ml-1 h-1.5 w-1.5 shrink-0 rounded-full bg-ice shadow-sm" />
+  ) : null;
+
   if (row.href) {
     return (
-      <Link href={row.href} role="menuitem" className={ITEM_ROW_BASE} onClick={onSelect}>
-        <MenuIcon name={row.icon} />
-        <span>{row.label}</span>
-        {row.badge ? <span className={cn(BADGE_PILL_BASE, "ml-auto")}>{row.badge}</span> : null}
+      <Link href={row.href} role="menuitem" aria-current={active ? "page" : undefined} className={cn(ITEM_ROW_BASE, activeClasses)} onClick={onSelect}>
+        {icon}
+        {label}
+        {activeDot}
+        {row.badge ? <UserMenuLiveBadge row={row} /> : null}
       </Link>
     );
   }
   return (
-    <button type="button" role="menuitem" className={ITEM_ROW_BASE} onClick={onSelect}>
-      <MenuIcon name={row.icon} />
-      <span>{row.label}</span>
+    <button type="button" role="menuitem" className={cn(ITEM_ROW_BASE, activeClasses)} onClick={onSelect}>
+      {icon}
+      {label}
+      {activeDot}
       {row.externalMark ? (
         <MaterialIcon
           name="open_in_new"
           className="ml-auto shrink-0 text-[14px] text-mist transition-colors group-hover:text-ice"
         />
       ) : null}
-      {row.badge ? <span className={cn(BADGE_PILL_BASE, "ml-auto")}>{row.badge}</span> : null}
+      {row.badge ? <UserMenuLiveBadge row={row} /> : null}
     </button>
+  );
+}
+
+/**
+ * Live badge counts for menu rows. Mounted only where a menu row declares a
+ * badge (opened, user-menu panel), so the RTKQ hooks never run during prerender
+ * (Cache Components guard); until data arrives the static badge value from
+ * `data/` stands in.
+ */
+function UserMenuLiveBadge({ row }: { row: UserMenuItemRow }) {
+  const kind = row.badgeKind ?? "pending";
+  if (kind === "pending") {
+    return <PendingApprovalsBadge fallback={row.badge} />;
+  }
+  return <MyProjectsBadge fallback={row.badge} />;
+}
+
+function PendingApprovalsBadge({ fallback }: { fallback?: string }) {
+  const pendingQuery = useListPendingUsersQuery();
+  const pending = pendingQuery.data?.data;
+  return (
+    <span className={cn(BADGE_PILL_BASE, "ml-auto")}>
+      {pending ? String(pending.length) : fallback}
+    </span>
+  );
+}
+
+function MyProjectsBadge({ fallback }: { fallback?: string }) {
+  const projectsQuery = useListProjectsQuery({ page: 1, limit: 1 });
+  const total = projectsQuery.data?.pagination.total;
+  return (
+    <span
+      aria-hidden="true"
+      className="ml-auto font-mono text-[10px] text-teal/60 transition-colors group-hover:text-teal"
+    >
+      {typeof total === "number" ? `#${total}` : fallback}
+    </span>
   );
 }
 
@@ -98,6 +157,7 @@ export function UserAvatarMenu() {
   const clearSession = useSessionClear();
   const { pending, logout } = useAccountLogout();
   const router = useRouter();
+  const roleKindId = menuRoleKind(user?.role ?? "");
 
   useEffect(() => {
     if (!open) return;
@@ -133,7 +193,6 @@ export function UserAvatarMenu() {
   }
 
   const role = user?.role ?? "";
-  const roleKindId = menuRoleKind(role);
   const badgeRow = USER_BADGE_ROWS[roleKindId];
   const badgeLabel = badgeRow.label ?? titleCase(role);
   const sections = MENU_SECTIONS_BY_ROLE[roleKindId];

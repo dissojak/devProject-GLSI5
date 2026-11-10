@@ -8,15 +8,15 @@ import type {
 export const adminApi = apiSlice.injectEndpoints({
   endpoints: (build) => ({
     listPendingUsers: build.query<AdminPendingResponse, void>({
-      query: () => "/users/pending",
+      query: () => "/admin/users/pending",
       providesTags: ["PendingUsers"],
     }),
     approveUser: build.mutation<AdminUserResponse, { id: string }>({
-      query: ({ id }) => ({ url: `/users/${id}/approve`, method: "POST" }),
+      query: ({ id }) => ({ url: `/admin/users/${id}/approve`, method: "POST" }),
       invalidatesTags: ["PendingUsers", "Users"],
     }),
     rejectUser: build.mutation<AdminUserResponse, { id: string }>({
-      query: ({ id }) => ({ url: `/users/${id}/reject`, method: "POST" }),
+      query: ({ id }) => ({ url: `/admin/users/${id}/reject`, method: "POST" }),
       invalidatesTags: ["PendingUsers", "Users"],
     }),
     listUsers: build.query<
@@ -24,7 +24,7 @@ export const adminApi = apiSlice.injectEndpoints({
       { q?: string; role?: string; includeDeleted?: boolean; page: number; limit: number }
     >({
       query: ({ q, role, includeDeleted, page, limit }) => ({
-        url: "/users",
+        url: "/admin/users",
         params: {
           ...(q ? { q } : {}),
           ...(role ? { role } : {}),
@@ -36,19 +36,19 @@ export const adminApi = apiSlice.injectEndpoints({
       providesTags: ["Users"],
     }),
     deactivateUser: build.mutation<AdminUserResponse, { id: string }>({
-      query: ({ id }) => ({ url: `/users/${id}/deactivate`, method: "POST" }),
+      query: ({ id }) => ({ url: `/admin/users/${id}/deactivate`, method: "POST" }),
       invalidatesTags: ["Users"],
     }),
     reactivateUser: build.mutation<AdminUserResponse, { id: string }>({
-      query: ({ id }) => ({ url: `/users/${id}/reactivate`, method: "POST" }),
+      query: ({ id }) => ({ url: `/admin/users/${id}/reactivate`, method: "POST" }),
       invalidatesTags: ["Users"],
     }),
     updateUser: build.mutation<AdminUserResponse, { id: string; name: string }>({
-      query: ({ id, name }) => ({ url: `/users/${id}`, method: "PATCH", body: { name } }),
+      query: ({ id, name }) => ({ url: `/admin/users/${id}`, method: "PATCH", body: { name } }),
       invalidatesTags: ["Users"],
     }),
     changeUserRole: build.mutation<AdminUserResponse, { id: string; role: string }>({
-      query: ({ id, role }) => ({ url: `/users/${id}/role`, method: "PATCH", body: { role } }),
+      query: ({ id, role }) => ({ url: `/admin/users/${id}/role`, method: "PATCH", body: { role } }),
       invalidatesTags: ["Users"],
     }),
   }),

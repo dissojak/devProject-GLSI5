@@ -15,6 +15,8 @@ interface TextFieldProps extends InputHTMLAttributes<HTMLInputElement> {
   error?: string | null;
   invalid?: boolean;
   labelAside?: ReactNode;
+  /** Interactive label-row aside (aria-visible, unlike labelAside). */
+  labelAction?: ReactNode;
   labelClass?: string;
   below?: ReactNode;
 }
@@ -27,6 +29,7 @@ export function TextField({
   error,
   invalid,
   labelAside,
+  labelAction,
   labelClass = "mb-2",
   below,
   disabled,
@@ -44,9 +47,14 @@ export function TextField({
         >
           {label}
         </label>
-        {labelAside ? (
-          <span aria-hidden="true" className="text-[10px] text-mist/70">
-            {labelAside}
+        {labelAside || labelAction ? (
+          <span className="ms-auto flex items-center gap-3">
+            {labelAside ? (
+              <span aria-hidden="true" className="text-[10px] text-mist/70">
+                {labelAside}
+              </span>
+            ) : null}
+            {labelAction}
           </span>
         ) : null}
       </div>

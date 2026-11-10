@@ -186,7 +186,7 @@ describe("LoginForm against the backend", () => {
       expect(appStore.getState().authSession).toEqual({
         token: "token-1",
         user: { id: "u1", name: "Ada Lovelace", email: "ada@example.com", role: "DEVELOPER" },
-        hydrated: false,
+        hydrated: true,
         expired: false,
       }),
     );

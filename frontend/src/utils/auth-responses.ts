@@ -70,6 +70,12 @@ export function parseApiError(payload: unknown): ApiErrorBody | null {
   return { code: error.code, message: error.message, details: error.details };
 }
 
+/** Human-readable backend message for a thrown RTKQ mutation error. */
+export function mutationErrorMessage(error: unknown, fallback: string): string {
+  const data = (error as { data?: unknown } | undefined)?.data;
+  return parseApiError(data)?.message ?? fallback;
+}
+
 export interface AuthSuccessPayload {
   user: AuthAccount | null;
   accessToken: string | null;

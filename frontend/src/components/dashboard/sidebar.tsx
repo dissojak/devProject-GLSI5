@@ -5,6 +5,7 @@ import {
   DASHBOARD_SOON_LABEL,
 } from "@/data/dashboard";
 import { MaterialIcon } from "@/shared/material-icon";
+import type { ReactNode } from "react";
 import { cn } from "@/utils/class-names";
 import type { DashboardNavRow, NavItemKind } from "@/types/dashboard";
 import { DashboardProfileCard } from "@/components/dashboard/session-profile";
@@ -39,7 +40,11 @@ function NavRowSoonChip() {
   );
 }
 
-export function DashboardSidebar() {
+interface DashboardSidebarProps {
+  extras?: ReactNode;
+}
+
+export function DashboardSidebar({ extras }: DashboardSidebarProps = {}) {
   return (
     <aside className="fixed left-0 top-0 z-50 flex h-screen w-[260px] select-none flex-col justify-between border-r border-surface-highest bg-abyss">
       <div className="flex flex-col">
@@ -90,6 +95,7 @@ export function DashboardSidebar() {
               ),
             )}
           </nav>
+          {extras ? <div className="px-0">{extras}</div> : null}
         </div>
       </div>
       <div className="border-t border-surface-highest/60 p-4">
