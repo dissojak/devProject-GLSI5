@@ -1,0 +1,415 @@
+import { Router } from 'express';
+
+import { getEnv } from '../config/env.js';
+
+// Feature routers
+import { createAuthRouter } from './auth.routes.js';
+import { createGithubAuthRouter } from './github-auth.routes.js';
+import { createProjectRouter } from './project.routes.js';
+import { createRepositoryLinkRouter } from './repository-link.routes.js';
+import { createRecommendationRouter } from './recommendation.routes.js';
+import { createRecommendationInternalRouter } from './recommendation-internal.routes.js';
+import { createAiAuditRouter } from './ai-audit.routes.js';
+import { createAiAuditInternalRouter } from './ai-audit-internal.routes.js';
+import { createAnalysisInternalRouter } from './analysis-internal.routes.js';
+import { createUsersRouter } from './users.routes.js';
+import { createUserApprovalRouter } from './user-approval.routes.js';
+import { createProfileRouter } from './profile.routes.js';
+// Middleware factories
+import { createRequireAuth } from '../middleware/require-auth.js';
+import { createRequireInternalSecret } from '../middleware/require-internal.secret.js';
+
+// Repositories
+import { UserRepository } from '../repositories/user.repository.js';
+import { AuthIdentityRepository } from '../repositories/auth-identity.repository.js';
+import { ProjectRepository } from '../repositories/project.repository.js';
+import { AnalysisRepository } from '../repositories/analysis.repository.js';
+import { RecommendationRepository } from '../repositories/recommendation.repository.js';
+import { AuditLogRepository } from '../repositories/audit-log.repository.js';
+import { PlanRepository } from '../repositories/plan.repository.js';
+
+// Functional service factories
+import { createAuthService } from '../services/auth/auth.service.js';
+import { createGithubAuthService } from '../services/auth/github-auth.service.js';
+import { createGithubOAuthService } from '../services/auth/github-oauth.service.js';
+import { createSessionTokenService } from '../services/auth/session-token.service.js';
+import { createProjectService } from '../services/project/project.service.js';
+import { createRepositoryLinkService } from '../services/repository-link/repository-link.service.js';
+import { createAnalysisService } from '../services/analysis/analysis.service.js';
+import { createRecommendationService } from '../services/recommendations/recommendation.service.js';
+import { createAiAuditService } from '../services/ai-audit/ai-audit.service.js';
+import { createN8nAiAuditTrigger } from '../services/ai-audit/n8n-ai-audit-trigger.js';
+import { createN8nAnalysisTrigger } from '../services/analysis/n8n-analysis-trigger.js';
+import { createUserService } from '../services/users/user.service.js';
+import { createUserApprovalService } from '../services/users/user-approval.service.js';
+import { createProfileService } from '../services/profile/profile.service.js';
+import { createAnalysisRouter } from './analysis.routes.js';
+import { createAiDeploymentPlanService } from '../services/ai-deployment-plan/ai-deployment-plan.service.js';
+import { createN8nAiPlanTrigger } from '../services/ai-deployment-plan/n8n-ai-plan-trigger.js';
+import { createAiDeploymentPlanRouter } from './ai-deployment-plan.routes.js';
+import { createDeploymentPlanRouter } from './deployment-plan.routes.js';
+import { createDeploymentPlanService } from '../services/deployment-plans/deployment-plan.service.js';
+import { createKubernetesManifestService } from '../services/kubernetes-manifests/kubernetes-manifest.service.js';
+import { createKubernetesManifestRouter } from './kubernetes-manifest.routes.js';
+
+import {
+  createKubectlMonitoringClient,
+} from '../services/kubernetes-monitoring/kubectl-monitoring.client.js';
+
+import {
+  createKubernetesMonitoringService,
+} from '../services/kubernetes-monitoring/kubernetes-monitoring.service.js';
+
+import {
+  createKubernetesMonitoringRouter,
+} from './kubernetes-monitoring.routes.js';
+import {
+  createKubectlDeploymentClient,
+} from '../services/kubernetes-deployment/kubectl-deployment.client.js';
+
+import {
+  createKubernetesDeploymentService,
+} from '../services/kubernetes-deployment/kubernetes-deployment.service.js';
+
+import {
+  createKubernetesDeploymentRouter,
+} from './kubernetes-deployment.routes.js';
+import { createDockerfileProposalsRouter } from './dockerfile-proposals.routes.js';
+import { createDockerfileProposalService } from '../services/dockerfile-proposals/dockerfile-proposals.service.js';
+import {
+  createKubectlValidationClient,
+} from '../services/kubernetes-server-validation/kubectl-validation.client.js';
+
+import {
+  createKubernetesServerValidationService,
+} from '../services/kubernetes-server-validation/kubernetes-server-validation.service.js';
+
+import {
+  createKubernetesServerValidationRouter,
+} from './kubernetes-server-validation.routes.js';
+import {
+  createGitHubCicdClient,
+} from '../services/cicd/github-cicd.client.js';
+
+import {
+  createCicdService,
+} from '../services/cicd/cicd.service.js';
+
+import {
+  createCicdRouter,
+} from './cicd.routes.js';
+
+import {
+  createGitHubActionsClient,
+} from '../services/cicd-monitor/github-actions.client.js';
+
+import {
+  createCicdBuildStatusService,
+} from '../services/cicd-monitor/cicd-build-status.service.js';
+
+import {
+  createCicdBuildStatusRouter,
+} from './cicd-build-status.routes.js';
+import {
+  createKubernetesValidationService,
+} from '../services/kubernetes-validation/kubernetes-validation.service.js';
+
+import {
+  createKubernetesValidationRouter,
+} from './kubernetes-validation.routes.js';
+import {
+  createKubernetesDeploymentHistoryService,
+} from '../services/kubernetes-deployment-history/kubernetes-deployment-history.service.js';
+
+import {
+  createRecordedKubernetesDeploymentService,
+} from '../services/kubernetes-deployment-history/recorded-kubernetes-deployment.service.js';
+
+import {
+  createKubernetesDeploymentHistoryRouter,
+} from './kubernetes-deployment-history.routes.js';
+/**
+ * API composition root.
+ *
+ * Responsibilities:
+ * - Load validated environment configuration.
+ * - Instantiate repositories once.
+ * - Build functional services.
+ * - Inject dependencies into feature routers.
+ *
+ * No business logic or database queries.
+ */
+export function createApiRouter(): Router {
+  const env = getEnv();
+
+  // Repositories
+  const users = new UserRepository();
+  const identities = new AuthIdentityRepository();
+  const projects = new ProjectRepository();
+  const analyses = new AnalysisRepository();
+  const recommendations = new RecommendationRepository();
+  const auditLogs = new AuditLogRepository();
+  const plans = new PlanRepository();
+    const githubCicd = createGitHubCicdClient(
+    env.githubAutomationToken ?? '',
+  );
+
+  const cicdService = createCicdService(
+    githubCicd,
+  );
+
+    const githubActions = createGitHubActionsClient(
+    env.githubAutomationToken ?? '',
+  );
+
+  const cicdBuildStatusService =
+    createCicdBuildStatusService(
+      githubActions,
+    );
+
+  // Shared services
+  const sessions = createSessionTokenService(env.sessionSecret);
+  const authService = createAuthService(users);
+  const userService = createUserService(users);
+  const approvalService = createUserApprovalService(users);
+  const projectService = createProjectService(projects);
+  const profileService = createProfileService(users);
+  const repositoryLink = createRepositoryLinkService(projects);
+  const analysisTrigger = createN8nAnalysisTrigger(env.n8nAnalysisWebhookUrl, env.n8nSharedSecret);
+  const recommendationService = createRecommendationService(recommendations, analyses, auditLogs);
+    const deploymentPlanService = createDeploymentPlanService(
+    plans,
+    projects,
+    analyses,
+    recommendations,
+    auditLogs,
+  );
+  const kubernetesManifestService = createKubernetesManifestService();
+  const kubernetesValidationService =
+    createKubernetesValidationService();
+  const aiAuditTrigger = createN8nAiAuditTrigger(env.n8nAiAuditWebhookUrl, env.n8nSharedSecret);
+  const aiAuditService = createAiAuditService(aiAuditTrigger, analyses, projects, auditLogs);
+    const aiPlanTrigger = createN8nAiPlanTrigger(
+    env.n8nAiPlanWebhookUrl,
+    env.n8nSharedSecret,
+  );
+
+  const aiDeploymentPlanService = createAiDeploymentPlanService(
+    aiPlanTrigger,
+    plans,
+    projects,
+    analyses,
+    recommendations,
+    auditLogs,
+  );
+  const analysisService = createAnalysisService(
+    analyses,
+    projects,
+    analysisTrigger,
+    recommendationService,
+    auditLogs,
+  );
+  const requireInternalSecret = createRequireInternalSecret(env.n8nSharedSecret);
+  const githubOAuthService = createGithubOAuthService(
+    env.githubClientId,
+    env.githubClientSecret,
+    env.githubCallbackUrl,
+  );
+
+  const githubAuthService = createGithubAuthService(users, identities);
+
+  // Authentication middleware
+  const requireAuth = createRequireAuth(sessions, userService);
+
+  // Main API router
+  const router = Router();
+
+  // Email/password authentication
+  router.use('/auth', createAuthRouter(authService, sessions, requireAuth));
+
+  // GitHub OAuth authentication
+  router.use(
+    '/auth',
+    createGithubAuthRouter({
+      oauth: githubOAuthService,
+      auth: githubAuthService,
+      sessions,
+      frontendUrl: env.frontendUrl,
+      secureCookies: env.nodeEnv === 'production',
+    }),
+  );
+
+  // Administrator user approval - MUST mount before the generic
+  // /admin/users routes, otherwise GET /users/pending is swallowed by
+  // GET /users/:id (id="pending" -> 400) - see docs/conventions.md.
+  router.use('/admin', createUserApprovalRouter(approvalService, requireAuth));
+
+  // Administrator user management
+  router.use('/admin', createUsersRouter(userService, requireAuth));
+
+  // User project management
+  router.use('/projects', createProjectRouter(projectService, requireAuth));
+  router.use('/projects', createRepositoryLinkRouter(repositoryLink, requireAuth));
+    router.use('/projects', createAnalysisRouter(analysisService, requireAuth));
+  router.use(
+    '/projects',
+    createDockerfileProposalsRouter(
+      createDockerfileProposalService(),
+      requireAuth,
+    ),
+  );
+  router.use('/projects', createRecommendationRouter(recommendationService, requireAuth));
+    router.use(
+    '/projects',
+    createAiDeploymentPlanRouter(
+      aiDeploymentPlanService,
+      requireAuth,
+    ),
+  );
+
+  router.use(
+    '/internal/analyses',
+    createAnalysisInternalRouter(analysisService, requireInternalSecret),
+  );
+  router.use(
+    '/internal/analyses',
+    createRecommendationInternalRouter(recommendationService, requireInternalSecret),
+  );
+    router.use(
+    '/internal/analyses',
+    createAiAuditInternalRouter(aiAuditService, requireInternalSecret),
+  );
+  router.use(
+    '/projects',
+    createAiAuditRouter(aiAuditService, requireAuth),
+  );
+  // Self-scoped profile (self-vs-admin read: mounted at /profile)
+  router.use('/profile', createProfileRouter(profileService, requireAuth));
+  router.use(
+  '/projects',
+  createDeploymentPlanRouter(
+    deploymentPlanService,
+    requireAuth,
+  ),
+);
+
+router.use(
+  '/projects',
+  createAiDeploymentPlanRouter(
+    aiDeploymentPlanService,
+    requireAuth,
+  ),
+);
+  router.use(
+    '/projects',
+    createKubernetesValidationRouter(
+      kubernetesValidationService,
+      requireAuth,
+    ),
+  );
+    router.use(
+    '/projects',
+    createCicdRouter(
+      cicdService,
+      requireAuth,
+    ),
+  );
+    router.use(
+    '/projects',
+    createCicdBuildStatusRouter(
+      cicdBuildStatusService,
+      requireAuth,
+    ),
+  );
+    router.use(
+    '/projects',
+    createKubernetesManifestRouter(
+      kubernetesManifestService,
+      requireAuth,
+    ),
+  );
+
+  if (env.nodeEnv === 'development') {
+    const monitoringClient =
+      createKubectlMonitoringClient(
+        'minikube',
+        'deploymentplanner-dev',
+      );
+
+    const monitoringService =
+      createKubernetesMonitoringService(
+        monitoringClient,
+      );
+
+    router.use(
+      '/projects',
+      createKubernetesMonitoringRouter(
+        monitoringService,
+        requireAuth,
+      ),
+    );
+  };
+  
+  if (env.nodeEnv === 'development') {
+    const kubectlDeployment =
+      createKubectlDeploymentClient({
+        context: 'minikube',
+        namespace: 'deploymentplanner-dev',
+      });
+
+    const kubernetesDeploymentService =
+      createKubernetesDeploymentService(
+        kubectlDeployment,
+      );
+
+    const historyService =
+      createKubernetesDeploymentHistoryService({
+        cluster: 'minikube',
+        namespace: 'deploymentplanner-dev',
+      });
+
+    const recordedDeploymentService =
+      createRecordedKubernetesDeploymentService(
+        kubernetesDeploymentService,
+        historyService,
+      );
+
+    router.use(
+      '/projects',
+      createKubernetesDeploymentRouter(
+        recordedDeploymentService,
+        requireAuth,
+      ),
+    );
+
+    router.use(
+      '/projects',
+      createKubernetesDeploymentHistoryRouter(
+        historyService,
+        requireAuth,
+      ),
+    );
+  }
+
+  if (env.nodeEnv === 'development') {
+    const kubectl = createKubectlValidationClient({
+      context: 'minikube',
+      namespace: 'default',
+    });
+
+    const serverValidationService =
+      createKubernetesServerValidationService(
+        kubectl,
+      );
+
+    router.use(
+      '/projects',
+      createKubernetesServerValidationRouter(
+        serverValidationService,
+        requireAuth,
+      ),
+    );
+  }
+
+  return router;
+}
