@@ -17,6 +17,7 @@ const VALID = {
   N8N_ANALYSIS_WEBHOOK_URL: 'http://localhost:5678/webhook/pipeline-analysis',
   N8N_SHARED_SECRET: 'test-n8n-shared-secret-that-is-at-least-32-bytes-long',
   N8N_AI_AUDIT_WEBHOOK_URL: 'http://localhost:5678/webhook/pipeline-ai-audit',
+  N8N_AI_PLAN_WEBHOOK_URL: 'http://localhost:5678/webhook/pipeline-ai-plan',
 };
 
 describe('config/env', () => {
@@ -73,6 +74,22 @@ describe('config/env', () => {
     expect(env.sessionSecret).toBe('test-session-secret-that-is-at-least-32-bytes-long');
     expect(env.n8nAnalysisWebhookUrl).toBe('http://localhost:5678/webhook/pipeline-analysis');
     expect(env.n8nSharedSecret).toBe('test-n8n-shared-secret-that-is-at-least-32-bytes-long');
+  });
+
+  it('turns a wildcard CORS origin into a matcher limited to that host', () => {
+    const env = loadEnv({ ...VALID, CORS_ORIGINS: 'http://localhost:30*, https://app.example.com' });
+    const [wildcard, literal] = env.corsOrigins;
+
+    expect(wildcard).toBeInstanceOf(RegExp);
+    expect(literal).toBe('https://app.example.com');
+    const matcher = wildcard as RegExp;
+    expect(matcher.test('http://localhost:3000')).toBe(true);
+    expect(matcher.test('http://localhost:3001')).toBe(true);
+    expect(matcher.test('http://localhost:3099')).toBe(true);
+    expect(matcher.test('http://localhost:4000')).toBe(false);
+    expect(matcher.test('http://localhost:3000.evil.com')).toBe(false);
+    expect(matcher.test('http://localhost:3000/x')).toBe(false);
+    expect(matcher.test('https://localhost:3000')).toBe(false);
   });
 
   it('rejects an empty CORS_ORIGINS list', () => {

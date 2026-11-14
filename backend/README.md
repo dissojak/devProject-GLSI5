@@ -47,10 +47,11 @@ openssl rand -base64 32        # put the output in TOKEN_ENCRYPTION_KEY
 | `NODE_ENV` | `development` \| `test` \| `production` (default `development`) |
 | `PORT` | HTTP port (default 4000) |
 | `MONGODB_URI` | Connection string (required) |
-| `CORS_ORIGINS` | Comma-separated browser origins (required) |
+| `CORS_ORIGINS` | Comma-separated browser origins (required); `*` matches one host/port run, e.g. `http://localhost:30*` = ports 3000-3099 |
 | `LOG_LEVEL` | `debug` \| `info` \| `warn` \| `error` (default `info`) |
 | `TOKEN_ENCRYPTION_KEY` | Base64 that decodes to exactly 32 bytes — AES-256-GCM key for GitHub tokens (required) |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub OAuth app credentials (required) |
+| `GITHUB_AUTOMATION_TOKEN` | Fine-grained PAT for CI/CD: pull requests, build status, run steps and build dispatch (optional; without it step 05 reports "GitHub Actions access is not configured") |
 | `GITHUB_CALLBACK_URL` | e.g. `http://localhost:4000/api/v1/auth/github/callback` (required) |
 | `FRONTEND_URL` | Browser origin for post-login redirects (required) |
 | `SESSION_SECRET` | Random string ≥ 32 bytes — session token signing (required; generate with `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"`) |

@@ -25,6 +25,7 @@ const COMPONENT = {
   name: 'api',
   type: 'BACKEND',
   containerPort: 3000,
+  image: 'ghcr.io/acme/api:plan-v1',
   replicas: 2,
   resources: {
     requests: { cpu: '100m', memory: '128Mi' },

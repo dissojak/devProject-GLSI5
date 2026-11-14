@@ -3,7 +3,7 @@
 import { Suspense } from "react";
 import { useSearchParams, useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MotionConfig } from "motion/react";
 import { AnimatePresence } from "motion/react";
 import { useToast } from "@/components/toast/toast-provider";
@@ -14,16 +14,17 @@ import {
   useLaunchAnalysisMutation,
 } from "@/store/analyses-api";
 import { useConnectProjectRepositoryMutation, useVerifyProjectRepositoryMutation, useUpdateProjectMutation, useDeleteProjectMutation } from "@/store/projects-api";
-import type { Analysis } from "@/types/analysis";
+import type { Analysis, AnalysisViewId } from "@/types/analysis";
+import type { ProjectStepId, WorkflowNavigation } from "@/types/workflow";
 import type { Project as ProjectType } from "@/types/project";
-import { ProjectHeader, type ProjectTab } from "@/components/project-detail/project-header";
+import { ProjectHeader } from "@/components/project-detail/project-header";
 import { RepositoryCard } from "@/components/project-detail/repository-card";
-import { PipelineStepper } from "@/components/project-detail/pipeline-stepper";
-import { RecentAnalyses } from "@/components/project-detail/recent-analyses";
 import { AnalysisSummary } from "@/components/project-detail/analysis-summary";
 import { AnalysesTable } from "@/components/project-detail/analyses-table";
 import { RecommendationFilters } from "@/components/project-detail/recommendation-filters";
 import { RecommendationCard } from "@/components/project-detail/recommendation-card";
+import { ProjectWorkflow } from "@/components/project-detail/project-workflow";
+import { AnalysisStepPanel } from "@/components/project-detail/analysis-step-panel";
 import { EditProjectModal } from "@/components/project-detail/edit-project-modal";
 import { UpdateRepositoryModal } from "@/components/project-detail/update-repository-modal";
 import { DeleteProjectModal } from "@/components/dashboard/delete-project-modal";
@@ -39,21 +40,24 @@ function ProjectDetailInner() {
   const router = useRouter();
   const toast = useToast();
 
-  const tabParam = (searchParams.get("tab") ?? "overview") as ProjectTab;
-  const tab: ProjectTab = ["overview", "analyses", "recommendations"].includes(tabParam)
-    ? tabParam
-    : "overview";
   const analysisParam = searchParams.get("analysis");
 
   const [page, setPage] = useState(1);
+  const [analysisView, setAnalysisView] = useState<AnalysisViewId>("results");
+  const [navigation, setNavigation] = useState<WorkflowNavigation<ProjectStepId> | null>(null);
+  const [activeStep, setActiveStep] = useState<ProjectStepId | null>(null);
+
+  const navigate = (step: ProjectStepId) => {
+    setNavigation((current) => ({ id: step, token: (current?.token ?? 0) + 1 }));
+  };
+
   const [editOpen, setEditOpen] = useState(false);
   const [repoOpen, setRepoOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [runningId, setRunningId] = useState<string | null>(null);
-
+  const notifiedAnalysisIds = useRef<Set<string>>(new Set());
   const projectQuery = useGetProjectQuery({ id }, { skip: !id });
   const analysesQuery = useListAnalysesQuery({ projectId: id, page, limit: 50 }, { skip: !id });
-  const recentQuery = useListAnalysesQuery({ projectId: id, page: 1, limit: 4 }, { skip: !id });
 
   const [launchAnalysis, launchMeta] = useLaunchAnalysisMutation();
   const [connectRepo, connectMeta] = useConnectProjectRepositoryMutation();
@@ -64,7 +68,6 @@ function ProjectDetailInner() {
   const project = projectQuery.data?.data as ProjectType | undefined;
   const analyses = analysesQuery.data?.data ?? [];
   const pagination = analysesQuery.data?.pagination;
-  const recent = recentQuery.data?.data ?? [];
 
   const latest = analyses[0] ?? null;
   const selectedId = analysisParam ?? latest?.id ?? null;
@@ -76,39 +79,71 @@ function ProjectDetailInner() {
   );
 
   useEffect(() => {
-    if (!polled.data) return;
-    const a = polled.data.data;
-    if (a.status === "COMPLETED" || a.status === "FAILED") {
-      const id2 = window.setTimeout(() => setRunningId(null), 0);
-      if (a.status === "COMPLETED") {
-        toast.push({ tone: "mint", title: `Analysis #${a.number} completed`, message: "Results are ready to review." });
-      } else {
-        toast.push({ tone: "crimson", title: `Analysis #${a.number} failed`, message: a.error?.message ?? "The analysis could not finish." });
-      }
-      analysesQuery.refetch();
-      recentQuery.refetch();
-      return () => window.clearTimeout(id2);
-    }
-  }, [polled.data, analysesQuery, recentQuery, toast]);
+  if (!runningId || !polled.data) return;
 
-  useEffect(() => {
-    if (latest && (latest.status === "PENDING" || latest.status === "RUNNING")) {
-      const id2 = window.setTimeout(() => setRunningId((c) => c ?? latest.id), 0);
-      return () => window.clearTimeout(id2);
-    }
-  }, [latest]);
+  const analysis = polled.data.data;
 
-  const setTab = (next: ProjectTab) => {
-    const sp = new URLSearchParams(searchParams.toString());
-    sp.set("tab", next);
-    router.replace(`/projects/${id}?${sp.toString()}`, { scroll: false });
-  };
+  if (analysis.id !== runningId) return;
+
+  const isCompleted = analysis.status === "COMPLETED";
+  const isFailed = analysis.status === "FAILED";
+
+  if (!isCompleted && !isFailed) return;
+
+  if (notifiedAnalysisIds.current.has(analysis.id)) return;
+
+  notifiedAnalysisIds.current.add(analysis.id);
+
+  toast.push({
+    tone: isCompleted ? "mint" : "crimson",
+    title: `Analysis #${analysis.number} ${
+      isCompleted ? "completed" : "failed"
+    }`,
+    message: isCompleted
+      ? "Results are ready to review."
+      : analysis.error?.message ?? "The analysis could not finish.",
+  });
+
+  void analysesQuery.refetch();
+
+  window.setTimeout(() => {
+    setRunningId((current) =>
+      current === analysis.id ? null : current
+    );
+  }, 0);
+}, [
+  runningId,
+  polled.data,
+  toast.push,
+  analysesQuery.refetch,
+]);
+
+  const latestId = latest?.id;
+const latestStatus = latest?.status;
+
+useEffect(() => {
+  if (!latestId) return;
+
+  if (latestStatus !== "PENDING" && latestStatus !== "RUNNING") {
+    return;
+  }
+
+  const timeoutId = window.setTimeout(() => {
+    setRunningId((current) => current ?? latestId);
+  }, 0);
+
+  return () => window.clearTimeout(timeoutId);
+}, [latestId, latestStatus]);
 
   const selectAnalysis = (aid: string) => {
     const sp = new URLSearchParams(searchParams.toString());
     sp.set("analysis", aid);
-    if (!sp.get("tab")) sp.set("tab", "overview");
     router.replace(`/projects/${id}?${sp.toString()}`, { scroll: false });
+  };
+
+  const viewAnalysis = (aid: string) => {
+    selectAnalysis(aid);
+    setAnalysisView("results");
   };
 
   async function handleRunAnalysis() {
@@ -119,7 +154,6 @@ function ProjectDetailInner() {
       setRunningId(a.id);
       toast.push({ tone: "ice", title: "Analysis started", message: `Analysis #${a.number} is running.` });
       analysesQuery.refetch();
-      recentQuery.refetch();
     } catch (err) {
       const e = err as { data?: { error?: { code?: string; message?: string } } };
       const code = e?.data?.error?.code;
@@ -242,9 +276,6 @@ function ProjectDetailInner() {
       <div className="flex w-full flex-col gap-6 p-8">
         <ProjectHeader
           project={project}
-          tab={tab}
-          tabCounts={{ analyses: pagination?.total ?? analyses.length }}
-          onTab={setTab}
           onRun={handleRunAnalysis}
           running={!!runningId}
           launchPending={launchMeta.isLoading}
@@ -271,38 +302,57 @@ function ProjectDetailInner() {
           </div>
         </div>
 
-        {invalidRepo ? (
-          <InvalidRepositoryState
-            project={project}
-            onReverify={handleReverify}
-            onReverifyPending={verifyMeta.isLoading}
-            onUpdate={() => setRepoOpen(true)}
-          />
-        ) : tab === "overview" ? (
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <div className="flex flex-col gap-6 lg:col-span-2">
-              <AnalysisSummary analysis={selectedAnalysis ?? latest} />
-              <RecentAnalyses analyses={recent} selectedId={selectedId} onSelect={selectAnalysis} />
-            </div>
-            <div className="flex flex-col gap-6">
-              <RepositoryCard project={project} verifying={verifyMeta.isLoading} onReverify={handleReverify} onUpdate={() => setRepoOpen(true)} />
-              <PipelineStepper analysisStatus={(selectedAnalysis ?? latest)?.status ?? null} />
-            </div>
-          </div>
-        ) : tab === "analyses" ? (
-          <div className="flex flex-col gap-6">
-            <AnalysesTable analyses={analyses} selectedId={selectedId} onSelect={selectAnalysis} />
-            {pagination && pagination.pageCount > 1 ? (
-              <div className="flex items-center justify-center gap-2">
-                <Button variant="champagne" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="h-9 px-4">Previous</Button>
-                <span className="font-mono text-label-sm text-mist">Page {pagination.page} of {pagination.pageCount}</span>
-                <Button variant="champagne" disabled={page >= pagination.pageCount} onClick={() => setPage((p) => Math.min(pagination.pageCount, p + 1))} className="h-9 px-4">Next</Button>
-              </div>
-            ) : null}
-          </div>
-        ) : (
-          <RecommendationsSection project={project} analysis={analysisForRecs} />
-        )}
+        <ProjectWorkflow
+          key={project.id}
+          project={project}
+          analysis={analysisForRecs}
+          analysesReady={!analysesQuery.isLoading}
+          repositoryPanel={
+            <RepositoryCard
+              project={project}
+              verifying={verifyMeta.isLoading}
+              onReverify={handleReverify}
+              onUpdate={() => setRepoOpen(true)}
+            />
+          }
+          repositoryAlert={
+            invalidRepo ? (
+              <InvalidRepositoryState
+                project={project}
+                onReverify={handleReverify}
+                onReverifyPending={verifyMeta.isLoading}
+                onUpdate={() => setRepoOpen(true)}
+              />
+            ) : null
+          }
+          navigation={navigation}
+          onNavigate={navigate}
+          activeId={activeStep}
+          onActiveChange={setActiveStep}
+          recommendationsPanel={<RecommendationsSection project={project} analysis={analysisForRecs} />}
+          analysisPanel={
+            <AnalysisStepPanel
+              view={analysisView}
+              onView={setAnalysisView}
+              counts={{ history: pagination?.total ?? analyses.length }}
+              panels={{
+                results: <AnalysisSummary analysis={selectedAnalysis ?? latest} />,
+                history: (
+                  <div className="flex flex-col gap-4">
+                    <AnalysesTable analyses={analyses} selectedId={selectedId} onSelect={viewAnalysis} />
+                    {pagination && pagination.pageCount > 1 ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <Button variant="champagne" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="h-9 px-4">Previous</Button>
+                        <span className="font-mono text-label-sm text-mist">Page {pagination.page} of {pagination.pageCount}</span>
+                        <Button variant="champagne" disabled={page >= pagination.pageCount} onClick={() => setPage((p) => Math.min(pagination.pageCount, p + 1))} className="h-9 px-4">Next</Button>
+                      </div>
+                    ) : null}
+                  </div>
+                ),
+              }}
+            />
+          }
+        />
       </div>
 
       <AnimatePresence>
@@ -379,6 +429,8 @@ function RecommendationsSection({ project, analysis }: { project: ProjectType; a
   const [reject, rejectMeta] = useRejectRecommendationMutation();
   const toast = useToast();
   const [polling, setPolling] = useState(false);
+  const [initialRecommendationCount, setInitialRecommendationCount] =
+  useState<number | null>(null);
 
   const listQuery = useListRecommendationsQuery(
     { projectId: project.id, analysisId: analysis?.id ?? "" },
@@ -409,9 +461,17 @@ function RecommendationsSection({ project, analysis }: { project: ProjectType; a
   }, [polling, listQuery, toast]);
 
   useEffect(() => {
-    if (!polling) return;
-    // stop polling once new AI recs arrive (heuristic: list changed size) — handled by user "stop waiting"
-  }, [polling]);
+  if (!polling || initialRecommendationCount === null) return;
+
+  if (recs.length <= initialRecommendationCount) return;
+
+  const timeoutId = window.setTimeout(() => {
+    setPolling(false);
+    setInitialRecommendationCount(null);
+  }, 0);
+
+  return () => window.clearTimeout(timeoutId);
+}, [polling, initialRecommendationCount, recs.length]);
 
   async function handleRunAudit() {
     if (!analysis) return;
@@ -427,6 +487,7 @@ function RecommendationsSection({ project, analysis }: { project: ProjectType; a
 
   async function handleAiAudit() {
     if (!analysis) return;
+    setInitialRecommendationCount(recs.length);
     try {
       await launchAi({ projectId: project.id, analysisId: analysis.id }).unwrap();
       setPolling(true);
