@@ -23,6 +23,9 @@ const NOTHING: Record<ProjectRequirement, boolean> = {
   dockerReady: false,
   approvedPlan: false,
   validManifests: false,
+  imagesPublished: false,
+  deployed: false,
+  healthy: false,
 };
 
 function resolve(met: Partial<Record<ProjectRequirement, boolean>>) {
@@ -147,5 +150,35 @@ describe("step URL parameter", () => {
     expect(stepIdFrom(PROJECT_WORKFLOW_STEPS, "plan")).toBe("plan");
     expect(stepIdFrom(PROJECT_WORKFLOW_STEPS, "nope")).toBeNull();
     expect(stepIdFrom(PROJECT_WORKFLOW_STEPS, null)).toBeNull();
+  });
+});
+
+describe("late workflow steps", () => {
+  const ALL_EARLY = {
+    verifiedRepository: true,
+    completedAnalysis: true,
+    reviewedRecommendations: true,
+    dockerReady: true,
+    approvedPlan: true,
+    validManifests: true,
+  };
+
+  it("ticks CI/CD only once the images are published", () => {
+    expect(statesOf(resolve(ALL_EARLY)).cicd).toBe("available");
+    expect(statesOf(resolve({ ...ALL_EARLY, imagesPublished: true })).cicd).toBe("complete");
+  });
+
+  it("ticks validation, deploy and history once a deployment is applied", () => {
+    expect(statesOf(resolve({ ...ALL_EARLY, deployed: true }))).toMatchObject({
+      "server-validation": "complete",
+      deploy: "complete",
+      history: "complete",
+      monitoring: "available",
+    });
+  });
+
+  it("ticks every step when the deployed app is healthy and the images are published", () => {
+    const steps = resolve({ ...ALL_EARLY, imagesPublished: true, deployed: true, healthy: true });
+    expect(steps.every((step) => step.state === "complete")).toBe(true);
   });
 });

@@ -28,12 +28,12 @@ export const PROJECT_STEP_RULES: ProjectStepRule[] = [
   { id: "docker", requires: "completedAnalysis", completeWhen: "dockerReady" },
   { id: "recommendations", requires: "completedAnalysis", completeWhen: "reviewedRecommendations" },
   { id: "plan", requires: "completedAnalysis", completeWhen: "approvedPlan" },
-  { id: "cicd", requires: "approvedPlan" },
+  { id: "cicd", requires: "approvedPlan", completeWhen: "imagesPublished" },
   { id: "manifests", requires: "approvedPlan", completeWhen: "validManifests" },
-  { id: "server-validation", requires: "validManifests" },
-  { id: "deploy", requires: "validManifests" },
-  { id: "monitoring", requires: "approvedPlan" },
-  { id: "history", requires: "approvedPlan" },
+  { id: "server-validation", requires: "validManifests", completeWhen: "deployed" },
+  { id: "deploy", requires: "validManifests", completeWhen: "deployed" },
+  { id: "monitoring", requires: "approvedPlan", completeWhen: "healthy" },
+  { id: "history", requires: "approvedPlan", completeWhen: "deployed" },
 ];
 
 export const PROJECT_LOCK_REASONS: Record<ProjectRequirement, string> = {
@@ -42,6 +42,9 @@ export const PROJECT_LOCK_REASONS: Record<ProjectRequirement, string> = {
   reviewedRecommendations: "Review the recommendations in step 03b to unlock this step.",
   dockerReady: "Add or save a Dockerfile in step 03 to unlock this step.",
   approvedPlan: "Approve the deployment plan in step 04 to unlock this step.",
+  imagesPublished: "Build and publish the Docker images in step 05 to unlock this step.",
+  deployed: "Deploy the manifests in step 08 to unlock this step.",
+  healthy: "Wait until every component is healthy in step 09.",
   validManifests: "Generate and validate the Kubernetes manifests in step 06 to unlock this step.",
 };
 
