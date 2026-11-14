@@ -53,6 +53,8 @@ export const apiSlice = createApi({
     "Plans",
     "Deployments",
     "DeploymentPlans",
+    "GithubConnection",
+    "GithubRepositories",
   ],
   endpoints: () => ({}),
 });

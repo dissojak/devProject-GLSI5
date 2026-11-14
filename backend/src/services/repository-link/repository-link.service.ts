@@ -8,6 +8,7 @@ import type { ConnectRepositoryInput } from './repository-link.schema.js';
 export function createRepositoryLinkService(
   projects: ProjectRepository = new ProjectRepository(),
   github: GithubRepositoryService = createGithubRepositoryService(),
+  githubTokenFor: (userId: string) => Promise<string | null> = async () => null,
 ) {
   async function findOwnedProject(
     userId: string,
@@ -24,6 +25,7 @@ export function createRepositoryLinkService(
 
   async function recordVerification(
     project: ProjectDocument,
+    userId: string,
   ): Promise<ProjectDocument> {
     const { repository } = project;
 
@@ -35,6 +37,7 @@ export function createRepositoryLinkService(
       repository.owner,
       repository.name,
       repository.branch,
+      await githubTokenFor(userId),
     );
 
     return check.ok
@@ -53,14 +56,14 @@ export function createRepositoryLinkService(
       input.branch,
     );
 
-    return recordVerification(connected);
+    return recordVerification(connected, userId);
   }
 
   async function verify(
     userId: string,
     projectId: string,
   ): Promise<ProjectDocument> {
-    return recordVerification(await findOwnedProject(userId, projectId));
+    return recordVerification(await findOwnedProject(userId, projectId), userId);
   }
 
   return { connect, verify };

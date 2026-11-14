@@ -3,6 +3,7 @@
 import { CONNECT_REPOSITORY_MODAL_ROW } from "@/data/dashboard-form";
 import type { RepositoryFieldError } from "@/utils/repository";
 import { MaterialIcon } from "@/shared/material-icon";
+import { GithubRepositoryPicker } from "@/components/dashboard/github-repository-picker";
 
 const REPOSITORY_INPUT_BASE =
   "h-12 w-full rounded-xl border border-steel bg-basin px-4 font-mono text-code-md text-foam outline-none transition-all placeholder:text-mist/60 focus:border-teal focus:ring-1 focus:ring-teal";
@@ -41,6 +42,14 @@ export function RepositoryFields({
 
   return (
     <>
+      <GithubRepositoryPicker
+        selectedUrl={url}
+        disabled={disabled}
+        onPick={(repository) => {
+          onUrlChange(repository.url);
+          onBranchChange(repository.defaultBranch);
+        }}
+      />
       <div className="flex flex-col gap-2">
         <label
           htmlFor="repository-url-input"

@@ -8,6 +8,11 @@ import type { RepositorySubmitResult } from "@/types/dashboard";
 import type { RepositoryRef } from "@/types/project";
 import { stubMotionEnvironment } from "@/tests/motion-stubs";
 
+vi.mock("@/hooks/use-github-connection", async () => {
+  const { disconnectedGithubHooks } = await import("@/tests/github-connection-stub");
+  return disconnectedGithubHooks;
+});
+
 vi.mock("next/link", () => ({
   default: ({ href, className, children }: { href: string; className?: string; children?: React.ReactNode }) =>
     React.createElement("a", { href, className }, children),

@@ -39,6 +39,12 @@ import { createGithubAuthService } from '../services/auth/github-auth.service.js
 import { createGithubOAuthService } from '../services/auth/github-oauth.service.js';
 import { createSessionTokenService } from '../services/auth/session-token.service.js';
 import { createProjectService } from '../services/project/project.service.js';
+import { createGithubConnectionService } from '../services/github-connection/github-connection.service.js';
+import {
+  createGithubConnectionCallbackRouter,
+  createGithubConnectionRouter,
+} from './github-connection.routes.js';
+import { GithubConnectionRepository } from '../repositories/github-connection.repository.js';
 import { createRepositoryLinkService } from '../services/repository-link/repository-link.service.js';
 import { createAnalysisService } from '../services/analysis/analysis.service.js';
 import { createPlanService } from '../services/plans/plan.service.js';
@@ -183,7 +189,22 @@ export function createApiRouter(): Router {
   const approvalService = createUserApprovalService(users);
   const projectService = createProjectService(projects);
   const profileService = createProfileService(users);
-  const repositoryLink = createRepositoryLinkService(projects);
+  const githubOAuthService = createGithubOAuthService(
+    env.githubClientId,
+    env.githubClientSecret,
+    env.githubCallbackUrl,
+  );
+  const githubConnections = createGithubConnectionService(
+    githubOAuthService,
+    env.tokenEncryptionKey,
+    `${env.sessionSecret}:github-connection`,
+    new GithubConnectionRepository(),
+  );
+  const repositoryLink = createRepositoryLinkService(
+    projects,
+    undefined,
+    githubConnections.accessToken,
+  );
   const analysisTrigger = createN8nAnalysisTrigger(env.n8nAnalysisWebhookUrl, env.n8nSharedSecret);
   const deploymentTrigger = createN8nDeploymentTrigger(
     env.n8nDeploymentWebhookUrl,
@@ -233,11 +254,6 @@ export function createApiRouter(): Router {
   );
   const deploymentService = createDeploymentService(deployments, projects, auditLogs);
   const requireInternalSecret = createRequireInternalSecret(env.n8nSharedSecret);
-  const githubOAuthService = createGithubOAuthService(
-    env.githubClientId,
-    env.githubClientSecret,
-    env.githubCallbackUrl,
-  );
 
   const githubAuthService = createGithubAuthService(users, identities);
 
@@ -249,6 +265,11 @@ export function createApiRouter(): Router {
 
   // Email/password authentication
   router.use('/auth', createAuthRouter(authService, sessions, requireAuth));
+
+  // GitHub repository access for signed-in users (private repos included).
+  // The callback is a browser redirect below /auth/github/callback.
+  router.use('/auth', createGithubConnectionCallbackRouter(githubConnections, env.frontendUrl));
+  router.use('/github', createGithubConnectionRouter(githubConnections, requireAuth));
 
   // GitHub OAuth authentication
   router.use(
