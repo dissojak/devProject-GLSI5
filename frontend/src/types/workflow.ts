@@ -31,7 +31,10 @@ export type ProjectRequirement =
   | "reviewedRecommendations"
   | "dockerReady"
   | "approvedPlan"
-  | "validManifests";
+  | "imagesPublished"
+  | "validManifests"
+  | "deployed"
+  | "healthy";
 
 export interface ProjectStepRule {
   id: ProjectStepId;

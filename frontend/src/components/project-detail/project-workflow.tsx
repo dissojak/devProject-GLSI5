@@ -12,6 +12,12 @@ import { useListDeploymentPlansQuery } from "@/hooks/use-deployment-plans";
 import { useInspectDockerfileProposalsQuery } from "@/hooks/use-dockerfile-proposals";
 import { useListKubernetesManifestsQuery } from "@/hooks/use-kubernetes-manifests";
 import { useListRecommendationsQuery } from "@/hooks/use-recommendations";
+import { useGetCicdBuildStatusQuery } from "@/hooks/use-cicd";
+import {
+  useGetKubernetesMonitoringQuery,
+  useListKubernetesDeploymentHistoryQuery,
+} from "@/hooks/use-kubernetes-status";
+import { hasAppliedDeployment, isDeploymentHealthy } from "@/utils/deployment-progress";
 import {
   phaseEntryStep,
   phaseOfStep,
@@ -98,6 +104,14 @@ export function ProjectWorkflow({
   const validManifests =
     approved && files.length > 0 && files.every((file) => file.validation.status === "VALID");
 
+  const buildStatusQuery = useGetCicdBuildStatusQuery({ projectId, planId }, { skip: !approved });
+  const historyQuery = useListKubernetesDeploymentHistoryQuery(
+    { projectId, planId, page: 1, limit: 10 },
+    { skip: !approved },
+  );
+  const deployed = approved && hasAppliedDeployment(historyQuery.data?.data ?? []);
+  const monitoringQuery = useGetKubernetesMonitoringQuery({ projectId, planId }, { skip: !deployed });
+
   const steps = resolveWorkflowSteps(
     PROJECT_WORKFLOW_STEPS,
     PROJECT_STEP_RULES,
@@ -110,7 +124,10 @@ export function ProjectWorkflow({
         Boolean(completedAnalysis?.docker.hasDockerfile) ||
         (dockerQuery.data?.data.generated.length ?? 0) > 0,
       approvedPlan: approved,
+      imagesPublished: buildStatusQuery.data?.data.status === "SUCCESS",
       validManifests,
+      deployed,
+      healthy: deployed && isDeploymentHealthy(monitoringQuery.data?.data),
     },
     PROJECT_LOCK_REASONS,
   );

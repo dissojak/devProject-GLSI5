@@ -21,6 +21,9 @@ const STEPS = resolveWorkflowSteps(
     dockerReady: true,
     approvedPlan: false,
     validManifests: false,
+    imagesPublished: false,
+    deployed: false,
+    healthy: false,
   },
   PROJECT_LOCK_REASONS,
 );
