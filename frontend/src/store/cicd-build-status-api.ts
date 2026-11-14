@@ -8,6 +8,32 @@ interface BuildParams {
   planId: string;
 }
 
+export interface BuildRunStep {
+  number: number;
+  name: string;
+  status: string;
+  conclusion: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
+export interface BuildLogLine {
+  text: string;
+  error: boolean;
+}
+
+export interface BuildRunJob {
+  id: number;
+  name: string;
+  status: string;
+  conclusion: string | null;
+  url: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  errorExcerpt?: BuildLogLine[];
+  steps: BuildRunStep[];
+}
+
 export interface BuildRun {
   id: number;
   name: string;
@@ -19,6 +45,7 @@ export interface BuildRun {
   commit: string;
   createdAt: string;
   updatedAt: string;
+  jobs?: BuildRunJob[];
 }
 
 export interface BuildStatus {

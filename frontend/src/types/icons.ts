@@ -73,4 +73,6 @@ export type MaterialIconName =
   | "expand_less"
   | "filter_list"
   | "save"
-  | "info";
+  | "info"
+  | "download"
+  | "block";

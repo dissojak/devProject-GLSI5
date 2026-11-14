@@ -80,7 +80,7 @@ export function KubernetesServerValidation({
   };
 
   return (
-    <div className="mt-5 rounded-xl border border-steel/50 bg-basin p-4">
+    <div className="rounded-xl border border-steel/50 bg-basin p-4">
       <h4 className="font-display text-body-md font-semibold text-foam">
         Kubernetes Server Validation
       </h4>

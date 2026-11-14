@@ -13,7 +13,7 @@ const RawEnvSchema = z.object({
   NODE_ENV: z.enum(ENV_NODE_ENV).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(4000),
   MONGODB_URI: z.string().trim().min(1, 'MONGODB_URI is required'),
-  CORS_ORIGINS: z.string().trim().min(1, 'CORS_ORIGINS is required (comma-separated origins list)'),
+  CORS_ORIGINS: z.string().trim().min(1, 'CORS_ORIGINS is required (comma-separated origins list, `*` wildcards allowed)'),
   LOG_LEVEL: z.enum(ENV_LOG_LEVEL).default('info'),
   TOKEN_ENCRYPTION_KEY: z
     .string()
@@ -53,7 +53,7 @@ export type Env = {
   nodeEnv: (typeof ENV_NODE_ENV)[number];
   port: number;
   mongodbUri: string;
-  corsOrigins: string[];
+  corsOrigins: (string | RegExp)[];
   logLevel: (typeof ENV_LOG_LEVEL)[number];
   tokenEncryptionKey: Buffer;
   githubClientId: string;
@@ -70,11 +70,28 @@ export type Env = {
 
 let cachedEnv: Env | undefined;
 
-function parseOrigins(raw: string): string[] {
+/**
+ * `*` in an origin matches one run of host/port characters (no `/`, `:` or
+ * `.`), so `http://localhost:30*` allows ports 3000-3099 but can never be
+ * stretched into another host. Literal origins stay plain strings.
+ */
+function toOriginMatcher(origin: string): string | RegExp {
+  if (!origin.includes('*')) {
+    return origin;
+  }
+  const pattern = origin
+    .split('*')
+    .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('[^/:.]*');
+  return new RegExp(`^${pattern}$`);
+}
+
+function parseOrigins(raw: string): (string | RegExp)[] {
   const origins = raw
     .split(',')
     .map((part) => part.trim())
-    .filter((part) => part.length > 0);
+    .filter((part) => part.length > 0)
+    .map(toOriginMatcher);
   if (origins.length === 0) {
     throw new Error('CORS_ORIGINS must contain at least one origin');
   }

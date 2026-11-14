@@ -71,8 +71,6 @@ export const kubernetesDeploymentHistoryApi =
             id: `${planId}-deployment-history`,
           },
         ],
-
-        refetchOnMountOrArgChange: true,
       }),
     }),
   });

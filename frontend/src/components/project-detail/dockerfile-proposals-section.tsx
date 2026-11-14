@@ -1,315 +1,200 @@
+"use client";
 
-'use client';
-
-import { useState } from 'react';
-
-import { Button } from '@/shared/button';
-
+import { useState } from "react";
+import { Button } from "@/shared/button";
+import { MaterialIcon } from "@/shared/material-icon";
+import { cn } from "@/utils/class-names";
+import { proposalFiles } from "@/utils/dockerfile-files";
 import {
   useGenerateDockerfileProposalsMutation,
   useInspectDockerfileProposalsQuery,
-} from '@/store/dockerfile-proposals-api';
-
+} from "@/hooks/use-dockerfile-proposals";
+import { DockerfileFileBrowser } from "@/components/project-detail/dockerfile-file-browser";
 import type {
   DockerfileCandidate,
-} from '@/types/dockerfile-proposals';
+  GeneratedDockerfile,
+} from "@/types/dockerfile-proposals";
 
 interface Props {
   projectId: string;
   analysisId: string;
 }
 
-function download(
-  name: string,
-  content: string,
-): void {
-  const blob = new Blob([content], {
-    type: 'text/plain;charset=utf-8',
-  });
-
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-
-  link.href = url;
-  link.download = name;
-
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-
-  URL.revokeObjectURL(url);
-}
-
 function messageOf(error: unknown): string {
   const response = error as {
-    data?: {
-      error?: {
-        message?: string;
-      };
-    };
+    data?: { error?: { message?: string } };
     message?: string;
   } | null;
-
-  return (
-    response?.data?.error?.message ??
-    response?.message ??
-    'Dockerfile generation failed'
-  );
+  return response?.data?.error?.message ?? response?.message ?? "Dockerfile generation failed";
 }
 
-function CandidateCard({
+function CandidateWorkbench({
   candidate,
-  persisted,
+  saved,
   busy,
-  onGenerate,
+  onSave,
 }: {
   candidate: DockerfileCandidate;
-  persisted: boolean;
+  saved: GeneratedDockerfile | undefined;
   busy: boolean;
-  onGenerate: (name: string) => void;
+  onSave: (name: string) => void;
 }) {
   const proposal = candidate.proposal;
 
   return (
-    <article className="rounded-xl border border-steel/50 bg-basin p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h4 className="font-display text-body-md font-semibold text-foam">
+    <article className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-display text-body-md font-semibold text-foam">
             {candidate.componentName}
-          </h4>
-
-          <p className="mt-1 break-all font-mono text-label-sm text-mist">
-            {candidate.path}
           </p>
+          <p className="mt-0.5 font-display text-body-sm text-mist">{candidate.reason}</p>
         </div>
-
-        <span className="rounded-full border border-steel px-3 py-1 font-mono text-label-sm text-mist">
-          {persisted ? 'PROPOSED' : candidate.status}
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          {proposal ? (
+            <span className="rounded-full bg-surface-high px-3 py-1 font-mono text-label-sm text-ice">
+              {proposal.strategy} template
+            </span>
+          ) : null}
+          <span className="rounded-full border border-steel px-3 py-1 font-mono text-label-sm text-mist">
+            {saved ? `SAVED · ${saved.validation.status}` : candidate.status}
+          </span>
+        </div>
       </div>
-
-      <p className="mt-3 font-display text-body-sm text-mist">
-        {candidate.reason}
-      </p>
 
       {proposal ? (
         <>
-          <p className="mt-3 font-mono text-label-sm text-ice">
-            Template: {proposal.strategy}
-          </p>
+          <DockerfileFileBrowser files={proposalFiles(proposal)} />
 
-          <pre className="mt-3 max-h-72 overflow-auto rounded-lg border border-steel/40 bg-abyss p-4 font-mono text-code-md text-ice">
-            <code>{proposal.content}</code>
-          </pre>
-                    <div className="mt-4 rounded-lg border border-steel/40 bg-panel p-3">
-            <p className="font-display text-body-sm font-semibold text-foam">
-              Generated files
-            </p>
-
-            <div className="mt-3 space-y-3">
-              {proposal.files.map((file) => (
-                <div
-                  key={file.path}
-                  className="rounded-lg border border-steel/40 bg-basin p-3"
-                >
-                  <p className="break-all font-mono text-code-md text-ice">
-                    {file.path}
-                  </p>
-
-                  <Button
-                    variant="teal"
-                    onClick={() =>
-                      download(
-                        file.path.split("/").at(-1) ?? "file",
-                        file.content,
-                      )
-                    }
-                  >
-                    Download file
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="flex flex-col gap-4 rounded-xl border border-steel/40 bg-basin p-4 sm:flex-row sm:items-start sm:justify-between">
+            {proposal.warnings.length > 0 ? (
+              <div className="min-w-0">
+                <p className="font-mono text-label-sm uppercase text-champagne">Before you build</p>
+                <ul className="mt-2 flex flex-col gap-1.5">
+                  {proposal.warnings.map((warning) => (
+                    <li key={warning} className="flex gap-2 font-display text-body-sm text-mist">
+                      <MaterialIcon name="warning" className="mt-0.5 text-[14px] text-champagne" />
+                      {warning}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <p className="font-display text-body-sm text-mist">No warnings for this template.</p>
+            )}
             <Button
-              variant="teal"
-              onClick={() =>
-                download('Dockerfile', proposal.content)
-              }
+              disabled={busy || Boolean(saved)}
+              onClick={() => onSave(candidate.componentName)}
+              className="shrink-0 gap-1.5 px-4 py-2 text-body-sm disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Download Dockerfile
-            </Button>
-
-            <Button
-              variant="teal"
-              onClick={() =>
-                download('.dockerignore', proposal.dockerignore)
-              }
-            >
-              Download .dockerignore
-            </Button>
-
-            <Button
-              disabled={busy || persisted}
-              onClick={() =>
-                onGenerate(candidate.componentName)
-              }
-            >
-              {persisted
-                ? 'Saved proposal'
-                : busy
-                  ? 'Saving...'
-                  : 'Save proposal'}
+              <MaterialIcon name={saved ? "check" : "save"} className="text-[16px]" />
+              {saved ? "Proposal saved" : busy ? "Saving…" : "Save proposal"}
             </Button>
           </div>
-
-          {proposal.warnings.length > 0 ? (
-            <ul className="mt-3 list-disc space-y-1 pl-5 font-display text-body-sm text-champagne">
-              {proposal.warnings.map((warning) => (
-                <li key={warning}>
-                  {warning}
-                </li>
-              ))}
-            </ul>
-          ) : null}
         </>
       ) : null}
     </article>
   );
 }
 
-export function DockerfileProposalsSection({
-  projectId,
-  analysisId,
-}: Props) {
-  const {
-    data,
-    isLoading,
-    isError,
-    refetch,
-  } = useInspectDockerfileProposalsQuery({
+export function DockerfileProposalsSection({ projectId, analysisId }: Props) {
+  const { data, isLoading, isFetching, isError, refetch } = useInspectDockerfileProposalsQuery({
     projectId,
     analysisId,
   });
-
-  const [generate, generateState] =
-    useGenerateDockerfileProposalsMutation();
-
-  const [feedback, setFeedback] =
-    useState<string | null>(null);
+  const [generate, generateState] = useGenerateDockerfileProposalsMutation();
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [selectedName, setSelectedName] = useState<string | null>(null);
 
   const candidates = data?.data.candidates ?? [];
-  const saved = data?.data.generated ?? [];
+  const generated = data?.data.generated ?? [];
+  const selected =
+    candidates.find((candidate) => candidate.componentName === selectedName) ?? candidates[0];
 
-  async function handleGenerate(name: string) {
+  async function handleSave(name: string) {
     setFeedback(null);
-
     try {
-      await generate({
-        projectId,
-        analysisId,
-        componentNames: [name],
-      }).unwrap();
-
-      setFeedback(
-        `Dockerfile proposal saved for ${name}. Build verification is still required.`,
-      );
+      await generate({ projectId, analysisId, componentNames: [name] }).unwrap();
+      setFeedback(`Proposal saved for ${name}. Build it once before deploying.`);
     } catch (error) {
       setFeedback(messageOf(error));
     }
   }
 
   return (
-    <section className="flex flex-col gap-4 rounded-2xl border border-steel bg-panel p-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <section className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="font-display text-headline-sm font-semibold text-foam">
-            Dockerfile proposals — US 7.3
+            Dockerfile proposal
           </h3>
-
-          <p className="mt-2 font-display text-body-sm text-mist">
-            Generate templates when the repository
-            analysis found no Dockerfile. Review and
-            build before deployment.
+          <p className="mt-1 font-display text-body-sm text-mist">
+            Generated from the analysis when the repository has no Dockerfile. Review each file
+            and build it before deploying.
           </p>
         </div>
-
         <Button
           variant="teal"
-          disabled={isLoading}
+          disabled={isFetching}
           onClick={() => void refetch()}
+          className="gap-1.5 px-3 py-1 text-body-sm"
         >
+          <MaterialIcon name="refresh" className={cn("text-[16px]", isFetching && "animate-spin")} />
           Refresh
         </Button>
       </div>
 
       {feedback ? (
-        <p
-          role="status"
-          className="rounded-lg border border-steel bg-basin p-3 text-body-sm text-foam"
-        >
+        <p role="status" className="rounded-lg border border-steel bg-basin p-3 font-display text-body-sm text-foam">
           {feedback}
         </p>
       ) : null}
 
       {isLoading ? (
-        <p className="text-body-sm text-mist">
-          Inspecting repository analysis...
-        </p>
+        <p className="font-display text-body-sm text-mist">Inspecting repository analysis…</p>
       ) : null}
 
       {isError ? (
-        <p
-          role="alert"
-          className="text-body-sm text-crimson"
-        >
-          Cannot load Dockerfile proposals.
+        <p role="alert" className="font-display text-body-sm text-crimson">
+          Couldn&apos;t load Dockerfile proposals. Select Refresh to try again.
         </p>
       ) : null}
 
-      {candidates.map((candidate) => (
-        <CandidateCard
-          key={`${candidate.componentName}:${candidate.path}`}
-          candidate={candidate}
-          persisted={saved.some(
-            (file) => file.path === candidate.path
-          )}
-          busy={generateState.isLoading}
-          onGenerate={(name) =>
-            void handleGenerate(name)
-          }
-        />
-      ))}
+      {!isLoading && !isError && candidates.length === 0 ? (
+        <p className="font-display text-body-sm text-mist">
+          No component needs a generated Dockerfile.
+        </p>
+      ) : null}
 
-      {saved.length > 0 ? (
-        <div className="rounded-lg border border-steel/40 bg-basin p-4">
-          <h4 className="font-display text-body-md font-semibold text-foam">
-            Saved Dockerfile proposals
-          </h4>
-
-          <div className="mt-3 flex flex-col gap-2">
-            {saved.map((file) => (
-              <div
-                key={file.id}
-                className="flex flex-wrap items-center justify-between gap-2"
-              >
-                <span className="break-all font-mono text-code-md text-mist">
-                  {file.path} ({file.validation.status})
-                </span>
-
-                <Button
-                  variant="teal"
-                  onClick={() =>
-                    download(file.fileName, file.content)
-                  }
-                >
-                  Download
-                </Button>
-              </div>
-            ))}
-          </div>
+      {candidates.length > 1 ? (
+        <div role="group" aria-label="Components" className="flex flex-wrap gap-2">
+          {candidates.map((candidate) => (
+            <button
+              key={candidate.componentName}
+              type="button"
+              aria-pressed={candidate === selected}
+              onClick={() => setSelectedName(candidate.componentName)}
+              className={cn(
+                "cursor-pointer rounded-full border px-3 py-1 font-mono text-label-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ice/40",
+                candidate === selected
+                  ? "border-ice/50 bg-ice/10 text-foam"
+                  : "border-steel text-mist hover:text-foam",
+              )}
+            >
+              {candidate.componentName}
+            </button>
+          ))}
         </div>
+      ) : null}
+
+      {selected ? (
+        <CandidateWorkbench
+          key={selected.componentName}
+          candidate={selected}
+          saved={generated.find((file) => file.path === selected.path)}
+          busy={generateState.isLoading}
+          onSave={(name) => void handleSave(name)}
+        />
       ) : null}
     </section>
   );

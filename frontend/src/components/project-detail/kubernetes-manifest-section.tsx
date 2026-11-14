@@ -2,31 +2,19 @@
 "use client";
 
 import { useState } from "react";
+import { createZip } from "@/utils/zip";
 
 import { Button } from "@/shared/button";
 
 import { KUBERNETES_MANIFEST_TEXT, KUBERNETES_KIND_LABELS, KUBERNETES_VALIDATION_LABELS } from "@/data/kubernetes-manifest";
 import {
-  KubernetesMonitoring,
-} from "@/components/project-detail/kubernetes-monitoring";
-import {
   useGenerateKubernetesManifestsMutation,
   useListKubernetesManifestsQuery,
   useValidateKubernetesManifestsMutation,
 } from "@/hooks/use-kubernetes-manifests";
-import {
-  KubernetesDeployment,
-} from "@/components/project-detail/kubernetes-deployment";
 import type {
   KubernetesManifest,
 } from "@/types/kubernetes-manifest";
-import {
-  KubernetesServerValidation,
-} from "@/components/project-detail/kubernetes-server-validation";
-
-import {
-  KubernetesDeploymentHistory,
-} from "@/components/project-detail/kubernetes-deployment-history";
 interface KubernetesManifestSectionProps {
   projectId: string;
   planId: string;
@@ -70,31 +58,26 @@ function downloadManifest(file: KubernetesManifest): void {
 
 function downloadAllManifests(
   files: readonly KubernetesManifest[],
-  planId: string,
 ): void {
   if (files.length === 0) {
     return;
   }
 
-  const content = files
-    .map(
-      (file) =>
-        [
-          `# ${file.path}`,
-          file.content.trim(),
-        ].join("\n"),
-    )
-    .join("\n---\n") + "\n";
+  const folder = `kubernetes-plan-v${files[0].planVersion}`;
+  const zip = createZip(
+    files.map((file) => ({
+      path: `${folder}/${file.path}`,
+      content: file.content.endsWith("\n") ? file.content : `${file.content}\n`,
+    })),
+  );
 
-  const blob = new Blob([content], {
-    type: "application/yaml;charset=utf-8",
-  });
-
-  const url = URL.createObjectURL(blob);
+  const url = URL.createObjectURL(
+    new Blob([zip.slice().buffer], { type: "application/zip" }),
+  );
   const anchor = document.createElement("a");
 
   anchor.href = url;
-  anchor.download = `deployment-plan-${planId}-kubernetes.yaml`;
+  anchor.download = `${folder}.zip`;
 
   document.body.appendChild(anchor);
   anchor.click();
@@ -295,43 +278,8 @@ export function KubernetesManifestSection({
         </p>
       ) : null}
 
-                  {files.length > 0 ? (
+      {files.length > 0 ? (
         <>
-            <KubernetesDeployment
-  projectId={projectId}
-  planId={planId}
-  eligible={
-    approved &&
-    files.length > 0 &&
-    files.every(
-      (file) =>
-        file.validation.status === "VALID",
-    )
-  }
-/>
-
-<KubernetesMonitoring
-  projectId={projectId}
-  planId={planId}
-  approved={approved}
-/>
-
-<KubernetesDeploymentHistory
-  projectId={projectId}
-  planId={planId}
-  approved={approved}
-/>
-          <KubernetesServerValidation
-            projectId={projectId}
-            planId={planId}
-            eligible={
-              approved &&
-              files.every(
-                (file) =>
-                  file.validation.status === "VALID",
-              )
-            }
-          />
           <div className="mt-5 rounded-xl border border-steel/50 bg-basin p-4">
             <h4 className="font-display text-body-md font-semibold text-foam">
               Kubernetes generation summary
@@ -360,13 +308,10 @@ export function KubernetesManifestSection({
               variant="teal"
               className="mt-4 min-h-10 px-5"
               onClick={() =>
-                downloadAllManifests(
-                  files,
-                  planId,
-                )
+                downloadAllManifests(files)
               }
             >
-              Download all manifests
+              Download all (.zip)
             </Button>
           </div>
 

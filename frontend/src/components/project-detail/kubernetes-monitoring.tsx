@@ -52,7 +52,7 @@ export function KubernetesMonitoring({
   const result = monitoring.data?.data;
 
   return (
-    <section className="mt-5 rounded-xl border border-steel/50 bg-basin p-5">
+    <section className="rounded-xl border border-steel/50 bg-basin p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h4 className="font-display text-body-md font-semibold text-foam">

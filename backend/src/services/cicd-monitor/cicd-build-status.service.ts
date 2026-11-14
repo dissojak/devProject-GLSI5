@@ -14,8 +14,14 @@ import {
 
 import type {
   GitHubActionsClient,
+  GitHubWorkflowJob,
   GitHubWorkflowRun,
 } from './github-actions.client.js';
+
+import {
+  extractLogExcerpt,
+  type LogExcerptLine,
+} from './log-excerpt.js';
 
 const WORKFLOW_PATH =
   '.github/workflows/build-images.yml';
@@ -44,11 +50,37 @@ function latestRelevantRun(
   )[0] ?? null;
 }
 
+function toRunJob(
+  job: GitHubWorkflowJob,
+  errorExcerpt: LogExcerptLine[],
+) {
+  return {
+    id: job.id,
+    name: job.name,
+    status: job.status,
+    conclusion: job.conclusion,
+    url: job.html_url,
+    startedAt: job.started_at,
+    completedAt: job.completed_at,
+    errorExcerpt,
+    steps: (job.steps ?? []).map((step) => ({
+      number: step.number,
+      name: step.name,
+      status: step.status,
+      conclusion: step.conclusion,
+      startedAt: step.started_at,
+      completedAt: step.completed_at,
+    })),
+  };
+}
+
 export function createCicdBuildStatusService(
   github: GitHubActionsClient,
   projects = new ProjectRepository(),
   plans = new PlanRepository(),
 ) {
+  const excerpts = new Map<number, LogExcerptLine[]>();
+
   async function getStatus(
     userId: string,
     projectId: string,
@@ -154,6 +186,8 @@ export function createCicdBuildStatusService(
       };
     }
 
+    const jobs = await loadRunJobs(owner, name, run.id);
+
     return {
       workflowPath: WORKFLOW_PATH,
       workflowInstalled: true,
@@ -175,8 +209,51 @@ export function createCicdBuildStatusService(
         commit: run.head_sha,
         createdAt: run.created_at,
         updatedAt: run.updated_at,
+        jobs,
       },
     };
+  }
+
+  async function loadRunJobs(
+    owner: string,
+    name: string,
+    runId: number,
+  ) {
+    try {
+      const jobs = await github.listRunJobs(owner, name, runId);
+      return await Promise.all(
+        jobs.map(async (job) =>
+          toRunJob(job, await loadErrorExcerpt(owner, name, job)),
+        ),
+      );
+    } catch {
+      return [];
+    }
+  }
+
+  async function loadErrorExcerpt(
+    owner: string,
+    name: string,
+    job: GitHubWorkflowJob,
+  ): Promise<LogExcerptLine[]> {
+    if (job.status !== 'completed' || job.conclusion !== 'failure') {
+      return [];
+    }
+
+    const cached = excerpts.get(job.id);
+
+    if (cached) {
+      return cached;
+    }
+
+    try {
+      const log = await github.getJobLog(owner, name, job.id);
+      const excerpt = log ? extractLogExcerpt(log) : [];
+      excerpts.set(job.id, excerpt);
+      return excerpt;
+    } catch {
+      return [];
+    }
   }
     async function requestBuild(
     userId: string,

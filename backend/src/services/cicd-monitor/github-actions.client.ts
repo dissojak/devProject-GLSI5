@@ -16,6 +16,30 @@ export interface GitHubWorkflowRun {
   updated_at: string;
 }
 
+export interface GitHubWorkflowStep {
+  name: string;
+  number: number;
+  status: string;
+  conclusion: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+export interface GitHubWorkflowJob {
+  id: number;
+  name: string;
+  status: string;
+  conclusion: string | null;
+  html_url: string;
+  started_at: string | null;
+  completed_at: string | null;
+  steps?: GitHubWorkflowStep[];
+}
+
+interface GitHubWorkflowJobsResponse {
+  jobs: GitHubWorkflowJob[];
+}
+
 interface GitHubWorkflowRunsResponse {
   workflow_runs: GitHubWorkflowRun[];
 }
@@ -158,6 +182,72 @@ export function createGitHubActionsClient(
     return result.data?.workflow_runs ?? [];
   }
 
+  async function listRunJobs(
+    owner: string,
+    repository: string,
+    runId: number,
+  ): Promise<GitHubWorkflowJob[]> {
+    const base = repositoryPath(
+      owner,
+      repository,
+    );
+
+    const result = await request<GitHubWorkflowJobsResponse>(
+      `${base}/actions/runs/${runId}/jobs?per_page=50`,
+    );
+
+    return result.data?.jobs ?? [];
+  }
+
+  async function getJobLog(
+    owner: string,
+    repository: string,
+    jobId: number,
+  ): Promise<string | null> {
+    if (!token.trim()) {
+      throw new ConflictError(
+        'GitHub Actions access is not configured',
+      );
+    }
+
+    const base = repositoryPath(
+      owner,
+      repository,
+    );
+
+    let response: Response;
+
+    try {
+      response = await fetch(
+        `https://api.github.com${base}/actions/jobs/${jobId}/logs`,
+        {
+          headers: {
+            Accept: 'application/vnd.github+json',
+            Authorization: `Bearer ${token}`,
+            'X-GitHub-Api-Version': '2022-11-28',
+          },
+          signal: AbortSignal.timeout(30000),
+        },
+      );
+    } catch {
+      throw new ConflictError(
+        'GitHub Actions API is unreachable',
+      );
+    }
+
+    if (response.status === 404 || response.status === 410) {
+      return null;
+    }
+
+    if (!response.ok) {
+      throw new ConflictError(
+        `GitHub Actions API failed (${response.status})`,
+      );
+    }
+
+    return response.text();
+  }
+
     async function dispatchWorkflow(
     owner: string,
     repository: string,
@@ -178,6 +268,8 @@ export function createGitHubActionsClient(
   return {
     getWorkflowContent,
     listWorkflowRuns,
+    listRunJobs,
+    getJobLog,
     dispatchWorkflow,
   };
 }

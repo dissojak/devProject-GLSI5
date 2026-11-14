@@ -1,3 +1,8 @@
+export interface DockerfileProposalFile {
+  path: string;
+  content: string;
+}
+
 
 export interface DockerfileProposal {
   componentName: string;
@@ -6,10 +11,7 @@ export interface DockerfileProposal {
   strategy: string;
   content: string;
   dockerignore: string;
-  files: Array<{
-    path: string;
-    content: string;
-  }>;
+  files: DockerfileProposalFile[];
   warnings: string[];
 }
 

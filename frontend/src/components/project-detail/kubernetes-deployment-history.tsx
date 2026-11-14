@@ -67,6 +67,7 @@ export function KubernetesDeploymentHistory({
     },
     {
       skip: !approved,
+      refetchOnMountOrArgChange: true,
     },
   );
 
@@ -75,7 +76,7 @@ export function KubernetesDeploymentHistory({
   const pagination = query.data?.pagination;
 
   return (
-    <section className="mt-6 rounded-2xl border border-steel bg-panel p-6">
+    <section className="rounded-2xl border border-steel bg-panel p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h3 className="font-display text-headline-sm font-semibold text-foam">

@@ -188,3 +188,5 @@ export interface AiAuditRequested {
 export interface RejectRecommendationBody {
   note?: string;
 }
+
+export type AnalysisViewId = "results" | "history";

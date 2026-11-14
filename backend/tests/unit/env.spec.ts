@@ -76,6 +76,22 @@ describe('config/env', () => {
     expect(env.n8nSharedSecret).toBe('test-n8n-shared-secret-that-is-at-least-32-bytes-long');
   });
 
+  it('turns a wildcard CORS origin into a matcher limited to that host', () => {
+    const env = loadEnv({ ...VALID, CORS_ORIGINS: 'http://localhost:30*, https://app.example.com' });
+    const [wildcard, literal] = env.corsOrigins;
+
+    expect(wildcard).toBeInstanceOf(RegExp);
+    expect(literal).toBe('https://app.example.com');
+    const matcher = wildcard as RegExp;
+    expect(matcher.test('http://localhost:3000')).toBe(true);
+    expect(matcher.test('http://localhost:3001')).toBe(true);
+    expect(matcher.test('http://localhost:3099')).toBe(true);
+    expect(matcher.test('http://localhost:4000')).toBe(false);
+    expect(matcher.test('http://localhost:3000.evil.com')).toBe(false);
+    expect(matcher.test('http://localhost:3000/x')).toBe(false);
+    expect(matcher.test('https://localhost:3000')).toBe(false);
+  });
+
   it('rejects an empty CORS_ORIGINS list', () => {
     expect(() => loadEnv({ ...VALID, CORS_ORIGINS: ' , ' })).toThrow(
       /CORS_ORIGINS must contain at least one origin/,

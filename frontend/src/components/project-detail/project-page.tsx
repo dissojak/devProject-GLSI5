@@ -14,17 +14,17 @@ import {
   useLaunchAnalysisMutation,
 } from "@/store/analyses-api";
 import { useConnectProjectRepositoryMutation, useVerifyProjectRepositoryMutation, useUpdateProjectMutation, useDeleteProjectMutation } from "@/store/projects-api";
-import type { Analysis } from "@/types/analysis";
+import type { Analysis, AnalysisViewId } from "@/types/analysis";
+import type { ProjectStepId, WorkflowNavigation } from "@/types/workflow";
 import type { Project as ProjectType } from "@/types/project";
-import { ProjectHeader, type ProjectTab } from "@/components/project-detail/project-header";
+import { ProjectHeader } from "@/components/project-detail/project-header";
 import { RepositoryCard } from "@/components/project-detail/repository-card";
-import { PipelineStepper } from "@/components/project-detail/pipeline-stepper";
-import { RecentAnalyses } from "@/components/project-detail/recent-analyses";
 import { AnalysisSummary } from "@/components/project-detail/analysis-summary";
 import { AnalysesTable } from "@/components/project-detail/analyses-table";
 import { RecommendationFilters } from "@/components/project-detail/recommendation-filters";
 import { RecommendationCard } from "@/components/project-detail/recommendation-card";
-import { DeploymentPlanSection } from "@/components/project-detail/deployment-plan-section";
+import { ProjectWorkflow } from "@/components/project-detail/project-workflow";
+import { AnalysisStepPanel } from "@/components/project-detail/analysis-step-panel";
 import { EditProjectModal } from "@/components/project-detail/edit-project-modal";
 import { UpdateRepositoryModal } from "@/components/project-detail/update-repository-modal";
 import { DeleteProjectModal } from "@/components/dashboard/delete-project-modal";
@@ -40,18 +40,17 @@ function ProjectDetailInner() {
   const router = useRouter();
   const toast = useToast();
 
-  const tabParam = (searchParams.get("tab") ?? "overview") as ProjectTab;
-  const tab: ProjectTab = [
-  "overview",
-  "analyses",
-  "recommendations",
-  "plans",
-].includes(tabParam)
-  ? tabParam
-  : "overview";
   const analysisParam = searchParams.get("analysis");
 
   const [page, setPage] = useState(1);
+  const [analysisView, setAnalysisView] = useState<AnalysisViewId>("results");
+  const [navigation, setNavigation] = useState<WorkflowNavigation<ProjectStepId> | null>(null);
+  const [activeStep, setActiveStep] = useState<ProjectStepId | null>(null);
+
+  const navigate = (step: ProjectStepId) => {
+    setNavigation((current) => ({ id: step, token: (current?.token ?? 0) + 1 }));
+  };
+
   const [editOpen, setEditOpen] = useState(false);
   const [repoOpen, setRepoOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -59,7 +58,6 @@ function ProjectDetailInner() {
   const notifiedAnalysisIds = useRef<Set<string>>(new Set());
   const projectQuery = useGetProjectQuery({ id }, { skip: !id });
   const analysesQuery = useListAnalysesQuery({ projectId: id, page, limit: 50 }, { skip: !id });
-  const recentQuery = useListAnalysesQuery({ projectId: id, page: 1, limit: 4 }, { skip: !id });
 
   const [launchAnalysis, launchMeta] = useLaunchAnalysisMutation();
   const [connectRepo, connectMeta] = useConnectProjectRepositoryMutation();
@@ -70,7 +68,6 @@ function ProjectDetailInner() {
   const project = projectQuery.data?.data as ProjectType | undefined;
   const analyses = analysesQuery.data?.data ?? [];
   const pagination = analysesQuery.data?.pagination;
-  const recent = recentQuery.data?.data ?? [];
 
   const latest = analyses[0] ?? null;
   const selectedId = analysisParam ?? latest?.id ?? null;
@@ -108,7 +105,6 @@ function ProjectDetailInner() {
   });
 
   void analysesQuery.refetch();
-  void recentQuery.refetch();
 
   window.setTimeout(() => {
     setRunningId((current) =>
@@ -120,7 +116,6 @@ function ProjectDetailInner() {
   polled.data,
   toast.push,
   analysesQuery.refetch,
-  recentQuery.refetch,
 ]);
 
   const latestId = latest?.id;
@@ -140,17 +135,15 @@ useEffect(() => {
   return () => window.clearTimeout(timeoutId);
 }, [latestId, latestStatus]);
 
-  const setTab = (next: ProjectTab) => {
-    const sp = new URLSearchParams(searchParams.toString());
-    sp.set("tab", next);
-    router.replace(`/projects/${id}?${sp.toString()}`, { scroll: false });
-  };
-
   const selectAnalysis = (aid: string) => {
     const sp = new URLSearchParams(searchParams.toString());
     sp.set("analysis", aid);
-    if (!sp.get("tab")) sp.set("tab", "overview");
     router.replace(`/projects/${id}?${sp.toString()}`, { scroll: false });
+  };
+
+  const viewAnalysis = (aid: string) => {
+    selectAnalysis(aid);
+    setAnalysisView("results");
   };
 
   async function handleRunAnalysis() {
@@ -161,7 +154,6 @@ useEffect(() => {
       setRunningId(a.id);
       toast.push({ tone: "ice", title: "Analysis started", message: `Analysis #${a.number} is running.` });
       analysesQuery.refetch();
-      recentQuery.refetch();
     } catch (err) {
       const e = err as { data?: { error?: { code?: string; message?: string } } };
       const code = e?.data?.error?.code;
@@ -284,9 +276,6 @@ useEffect(() => {
       <div className="flex w-full flex-col gap-6 p-8">
         <ProjectHeader
           project={project}
-          tab={tab}
-          tabCounts={{ analyses: pagination?.total ?? analyses.length }}
-          onTab={setTab}
           onRun={handleRunAnalysis}
           running={!!runningId}
           launchPending={launchMeta.isLoading}
@@ -313,47 +302,57 @@ useEffect(() => {
           </div>
         </div>
 
-        {invalidRepo ? (
-          <InvalidRepositoryState
-            project={project}
-            onReverify={handleReverify}
-            onReverifyPending={verifyMeta.isLoading}
-            onUpdate={() => setRepoOpen(true)}
-          />
-        ) : tab === "overview" ? (
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <div className="flex flex-col gap-6 lg:col-span-2">
-              <AnalysisSummary analysis={selectedAnalysis ?? latest} />
-              <RecentAnalyses analyses={recent} selectedId={selectedId} onSelect={selectAnalysis} />
-            </div>
-            <div className="flex flex-col gap-6">
-              <RepositoryCard project={project} verifying={verifyMeta.isLoading} onReverify={handleReverify} onUpdate={() => setRepoOpen(true)} />
-              <PipelineStepper analysisStatus={(selectedAnalysis ?? latest)?.status ?? null} />
-            </div>
-          </div>
-        ) : tab === "analyses" ? (
-          <div className="flex flex-col gap-6">
-            <AnalysesTable analyses={analyses} selectedId={selectedId} onSelect={selectAnalysis} />
-            {pagination && pagination.pageCount > 1 ? (
-              <div className="flex items-center justify-center gap-2">
-                <Button variant="champagne" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="h-9 px-4">Previous</Button>
-                <span className="font-mono text-label-sm text-mist">Page {pagination.page} of {pagination.pageCount}</span>
-                <Button variant="champagne" disabled={page >= pagination.pageCount} onClick={() => setPage((p) => Math.min(pagination.pageCount, p + 1))} className="h-9 px-4">Next</Button>
-              </div>
-            ) : null}
-          </div>
-        ) : tab === "recommendations" ? (
-  <RecommendationsSection
-    project={project}
-    analysis={analysisForRecs}
-  />
-) : (
-  <DeploymentPlanSection
-    key={analysisForRecs?.id ?? "no-analysis"}
-    projectId={project.id}
-    analysis={analysisForRecs}
-  />
-)}
+        <ProjectWorkflow
+          key={project.id}
+          project={project}
+          analysis={analysisForRecs}
+          analysesReady={!analysesQuery.isLoading}
+          repositoryPanel={
+            <RepositoryCard
+              project={project}
+              verifying={verifyMeta.isLoading}
+              onReverify={handleReverify}
+              onUpdate={() => setRepoOpen(true)}
+            />
+          }
+          repositoryAlert={
+            invalidRepo ? (
+              <InvalidRepositoryState
+                project={project}
+                onReverify={handleReverify}
+                onReverifyPending={verifyMeta.isLoading}
+                onUpdate={() => setRepoOpen(true)}
+              />
+            ) : null
+          }
+          navigation={navigation}
+          onNavigate={navigate}
+          activeId={activeStep}
+          onActiveChange={setActiveStep}
+          recommendationsPanel={<RecommendationsSection project={project} analysis={analysisForRecs} />}
+          analysisPanel={
+            <AnalysisStepPanel
+              view={analysisView}
+              onView={setAnalysisView}
+              counts={{ history: pagination?.total ?? analyses.length }}
+              panels={{
+                results: <AnalysisSummary analysis={selectedAnalysis ?? latest} />,
+                history: (
+                  <div className="flex flex-col gap-4">
+                    <AnalysesTable analyses={analyses} selectedId={selectedId} onSelect={viewAnalysis} />
+                    {pagination && pagination.pageCount > 1 ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <Button variant="champagne" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="h-9 px-4">Previous</Button>
+                        <span className="font-mono text-label-sm text-mist">Page {pagination.page} of {pagination.pageCount}</span>
+                        <Button variant="champagne" disabled={page >= pagination.pageCount} onClick={() => setPage((p) => Math.min(pagination.pageCount, p + 1))} className="h-9 px-4">Next</Button>
+                      </div>
+                    ) : null}
+                  </div>
+                ),
+              }}
+            />
+          }
+        />
       </div>
 
       <AnimatePresence>

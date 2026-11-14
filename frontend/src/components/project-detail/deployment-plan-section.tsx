@@ -7,9 +7,18 @@ import {
 } from "@/utils/ai-assumption-status";
 import type { Analysis } from "@/types/analysis";
 import type {
+  DeploymentPlan,
   PlanComponent,
   PlanComponentType,
 } from "@/types/deployment-plan";
+import {
+  changedComponents,
+  componentUpdateBody,
+  editablePlanComponent,
+  nextPlanVersion,
+  planEditMode,
+  type PlanEditMode,
+} from "@/utils/plan-components";
 
 import { PLAN_STATUS_DISPLAY } from "@/data/deployment-plan";
 import { cn } from "@/utils/class-names";
@@ -17,7 +26,6 @@ import { Button } from "@/shared/button";
 import { MaterialIcon } from "@/shared/material-icon";
 
 import { DeploymentPlanComponentForm } from "@/components/project-detail/deployment-plan-component-form";
-import { KubernetesManifestSection } from "@/components/project-detail/kubernetes-manifest-section";
 
 import {
   useListDeploymentPlansQuery,
@@ -31,13 +39,43 @@ import {
   useGenerateAiDeploymentPlanMutation,
 } from "@/hooks/use-ai-deployment-plan";
 
-import {
-  CicdSection,
-} from "@/components/project-detail/cicd-section";
+const MANUAL_COPY: Record<
+  PlanEditMode,
+  {
+    title: (base: DeploymentPlan | null) => string;
+    description: (base: DeploymentPlan | null, next: number) => string;
+    save: (next: number) => string;
+    saving: string;
+  }
+> = {
+  create: {
+    title: () => "Manual Deployment Plan",
+    description: () =>
+      "Configure every detected component manually. AI generation is the recommended default.",
+    save: () => "Create draft",
+    saving: "Creating...",
+  },
+  update: {
+    title: (base) => `Edit Deployment Plan v${base?.version ?? ""}`,
+    description: () =>
+      "Every field starts with this draft's current values. Change what you need and save to update the draft.",
+    save: () => "Save changes",
+    saving: "Saving...",
+  },
+  version: {
+    title: (base) => `Edit Deployment Plan v${base?.version ?? ""}`,
+    description: (base, next) =>
+      `Every field starts with v${base?.version ?? ""}'s values. v${base?.version ?? ""} stays unchanged because it is ${base?.status.toLowerCase() ?? ""}; saving creates draft v${next} for review and approval.`,
+    save: (next) => `Save as v${next}`,
+    saving: "Saving...",
+  },
+};
 
 interface DeploymentPlanSectionProps {
   projectId: string;
   analysis: Analysis | null;
+  selectedPlanId: string | null;
+  onSelectPlan: (planId: string) => void;
 }
 
 interface AiAssumptions {
@@ -243,6 +281,8 @@ function StatCard({
 export function DeploymentPlanSection({
   projectId,
   analysis,
+  selectedPlanId,
+  onSelectPlan,
 }: DeploymentPlanSectionProps) {
   const toast = useToast();
   const plansQuery = useListDeploymentPlansQuery({
@@ -264,14 +304,17 @@ export function DeploymentPlanSection({
   const [rejectPlan, rejectMeta] =
     useRejectDeploymentPlanMutation();
 
-  const [selectedId, setSelectedId] =
-    useState<string | null>(null);
+  const selectedId = selectedPlanId;
+  const setSelectedId = onSelectPlan;
 
   const [manualMode, setManualMode] =
     useState(false);
 
   const [manualComponents, setManualComponents] =
     useState<PlanComponent[]>([]);
+
+  const [manualBase, setManualBase] =
+    useState<DeploymentPlan | null>(null);
 
   const [editingName, setEditingName] =
     useState<string | null>(null);
@@ -306,6 +349,9 @@ export function DeploymentPlanSection({
     updateMeta.isLoading ||
     approveMeta.isLoading ||
     rejectMeta.isLoading;
+
+  const manualCopy = MANUAL_COPY[planEditMode(manualBase)];
+  const nextVersion = nextPlanVersion(plans);
 
   const manualValid =
     manualComponents.length > 0 &&
@@ -346,8 +392,11 @@ export function DeploymentPlanSection({
       return;
     }
 
+    setManualBase(selectedPlan);
     setManualComponents(
-      buildInitialComponents(completedAnalysis),
+      selectedPlan
+        ? selectedPlan.components.map(editablePlanComponent)
+        : buildInitialComponents(completedAnalysis),
     );
 
     setManualMode(true);
@@ -405,18 +454,24 @@ export function DeploymentPlanSection({
       return;
     }
 
+    if (manualBase && planEditMode(manualBase) === "update") {
+      await handleUpdateDraft(manualBase);
+      return;
+    }
+
     try {
       const result = await createPlan({
         projectId,
         body: {
-          analysisId: completedAnalysis.id,
-          components: manualComponents,
+          analysisId: manualBase?.analysis ?? completedAnalysis.id,
+          components: manualComponents.map(editablePlanComponent),
         },
       }).unwrap();
 
       setSelectedId(result.data.id);
       setManualMode(false);
       setManualComponents([]);
+      setManualBase(null);
 
       toast.push({
         tone: "mint",
@@ -425,6 +480,36 @@ export function DeploymentPlanSection({
       });
     } catch (error) {
       showError(error, "Manual plan creation failed");
+    }
+  }
+
+  async function handleUpdateDraft(base: DeploymentPlan) {
+    const changed = changedComponents(base.components, manualComponents);
+
+    try {
+      for (const component of changed) {
+        await updateComponent({
+          projectId,
+          planId: base.id,
+          name: component.name,
+          body: componentUpdateBody(component),
+        }).unwrap();
+      }
+
+      setManualMode(false);
+      setManualComponents([]);
+      setManualBase(null);
+
+      toast.push({
+        tone: "mint",
+        title: `Deployment Plan v${base.version} updated`,
+        message:
+          changed.length === 0
+            ? "No values changed."
+            : `${changed.length} component(s) saved.`,
+      });
+    } catch (error) {
+      showError(error, "Plan update failed");
     }
   }
 
@@ -458,16 +543,7 @@ export function DeploymentPlanSection({
         projectId,
         planId: selectedPlan.id,
         name: editingName,
-        body: {
-          containerPort: editedComponent.containerPort,
-          servicePort: editedComponent.servicePort ?? null,
-          targetPort: editedComponent.targetPort ?? null,
-          image: editedComponent.image?.trim() ?? "",
-          replicas: editedComponent.replicas,
-          resources: editedComponent.resources,
-          hpa: editedComponent.hpa,
-          ingress: editedComponent.ingress,
-        },
+        body: componentUpdateBody(editedComponent),
       }).unwrap();
 
       resetEditing();
@@ -594,10 +670,12 @@ export function DeploymentPlanSection({
               className="h-10 gap-2 px-5"
             >
               <MaterialIcon
-                name="edit"
+                name={selectedPlan ? "edit" : "tune"}
                 className="text-[18px]"
               />
-              Manual configuration
+              {selectedPlan
+                ? `Edit configuration (v${selectedPlan.version})`
+                : "Manual configuration"}
             </Button>
           </div>
         </div>
@@ -672,12 +750,11 @@ export function DeploymentPlanSection({
           >
             <div className="rounded-2xl border border-steel bg-basin p-5">
               <h3 className="font-display text-headline-sm font-semibold text-foam">
-                Manual Deployment Plan
+                {manualCopy.title(manualBase)}
               </h3>
 
               <p className="mt-2 font-display text-body-sm text-mist">
-                Configure every detected component manually.
-                AI generation is the recommended default.
+                {manualCopy.description(manualBase, nextVersion)}
               </p>
 
               <p className="mt-2 font-mono text-label-sm text-ice">
@@ -704,7 +781,10 @@ export function DeploymentPlanSection({
               <Button
                 variant="champagne"
                 disabled={isBusy}
-                onClick={() => setManualMode(false)}
+                onClick={() => {
+                  setManualMode(false);
+                  setManualBase(null);
+                }}
                 className="h-10 px-5"
               >
                 Cancel
@@ -722,9 +802,9 @@ export function DeploymentPlanSection({
                   className="text-[18px]"
                 />
 
-                {createMeta.isLoading
-                  ? "Creating..."
-                  : "Create draft"}
+                {createMeta.isLoading || updateMeta.isLoading
+                  ? manualCopy.saving
+                  : manualCopy.save(nextVersion)}
               </Button>
             </div>
           </motion.div>
@@ -970,18 +1050,6 @@ export function DeploymentPlanSection({
                     </div>
                   );
                 })}
-                <CicdSection
-                  key={`cicd-${selectedPlan.id}`}
-                  projectId={projectId}
-                  planId={selectedPlan.id}
-                  approved={selectedPlan.status === "APPROVED"}
-                />
-                <KubernetesManifestSection
-                  key={selectedPlan.id}
-                  projectId={projectId}
-                  planId={selectedPlan.id}
-                  approved={selectedPlan.status === "APPROVED"}
-                />
                 {selectedPlan.review?.reason ? (
                   <div className="rounded-xl border border-crimson/40 bg-crimson/10 p-5">
                     <h3 className="font-display text-body-md font-semibold text-crimson">

@@ -19,7 +19,7 @@
     "db:sync-indexes": "tsx --env-file-if-exists=.env src/scripts/sync-indexes.ts",
     "admin:create": "tsx --env-file-if-exists=.env src/scripts/create-admin.ts",
     "db:backfill-user-status": "tsx --env-file-if-exists=.env src/scripts/backfill-user-status.ts",
-  "db:backfill-analysis-numbers": "tsx --env-file-if-exists=.env src/scripts/backfill-analysis-numbers.ts"
+    "db:backfill-analysis-numbers": "tsx --env-file-if-exists=.env src/scripts/backfill-analysis-numbers.ts"
   },
   "dependencies": {
     "argon2": "^0.45.1",
@@ -47,7 +47,7 @@
     "supertest": "^7.3.1",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.71.2",
+    "typescript-eslint": "^8.36.0",
     "vitest": "^5.0.5"
   },
   "allowScripts": {
