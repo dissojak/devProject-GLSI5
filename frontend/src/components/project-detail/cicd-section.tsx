@@ -230,9 +230,10 @@ export function CicdSection({ projectId, planId, approved }: Props) {
       {previewQuery.isError ? (
         <p role="alert" className="font-display text-body-sm text-crimson">
           {getErrorMessage(previewQuery.error)}{" "}
-          <button type="button" onClick={() => void previewQuery.refetch()} className="text-ice underline">
+<Button variant="teal" size="sm" onClick={() => void previewQuery.refetch()} className="ml-2">
+            <MaterialIcon name="refresh" className="text-[16px]" />
             Retry
-          </button>
+          </Button>
         </p>
       ) : null}
 

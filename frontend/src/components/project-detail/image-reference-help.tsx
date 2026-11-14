@@ -1,6 +1,9 @@
 
 "use client";
 
+import { Button } from "@/shared/button";
+import { MaterialIcon } from "@/shared/material-icon";
+
 interface ImageReferenceHelpProps {
   image?: string;
   disabled?: boolean;
@@ -55,14 +58,16 @@ export function ImageReferenceHelp({
       </p>
 
       {hasImage ? (
-        <button
-          type="button"
+        <Button
+          variant="teal"
+          size="sm"
           disabled={disabled}
           onClick={() => onChange("")}
-          className="mt-3 font-display text-body-sm text-ice underline disabled:opacity-50"
+          className="mt-3"
         >
+          <MaterialIcon name="close" className="text-[16px]" />
           Clear image reference
-        </button>
+        </Button>
       ) : null}
     </div>
   );

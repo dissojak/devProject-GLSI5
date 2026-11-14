@@ -723,13 +723,10 @@ export function DeploymentPlanSection({
               Could not load deployment plans.
             </p>
 
-            <button
-              type="button"
-              onClick={() => void plansQuery.refetch()}
-              className="mt-2 font-display text-body-sm text-ice hover:underline"
-            >
-              Retry
-            </button>
+<Button variant="teal" size="sm" onClick={() => void plansQuery.refetch()} className="mt-3">
+            <MaterialIcon name="refresh" className="text-[16px]" />
+            Retry
+          </Button>
           </div>
         ) : null}
 

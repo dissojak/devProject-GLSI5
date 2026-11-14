@@ -1,6 +1,7 @@
 
 "use client";
 
+import { MaterialIcon } from "@/shared/material-icon";
 import { useState } from "react";
 import { createZip } from "@/utils/zip";
 
@@ -260,13 +261,10 @@ export function KubernetesManifestSection({
             {KUBERNETES_MANIFEST_TEXT.loadingFailed}
           </p>
 
-          <button
-            type="button"
-            onClick={() => void manifestsQuery.refetch()}
-            className="mt-3 text-body-sm text-ice underline"
-          >
+<Button variant="teal" size="sm" onClick={() => void manifestsQuery.refetch()} className="mt-3">
+            <MaterialIcon name="refresh" className="text-[16px]" />
             {KUBERNETES_MANIFEST_TEXT.retry}
-          </button>
+          </Button>
         </div>
       ) : null}
 

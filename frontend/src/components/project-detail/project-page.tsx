@@ -258,7 +258,10 @@ useEffect(() => {
       <div className="p-8">
         <p className="font-display text-headline-md text-foam">Could not load project</p>
         <p className="mt-2 font-display text-body-md text-mist">{extractMessage(projectQuery.error)}</p>
-        <button type="button" onClick={() => projectQuery.refetch()} className="mt-4 font-display text-body-md text-ice hover:underline">Retry</button>
+        <Button variant="teal" size="sm" onClick={() => projectQuery.refetch()} className="mt-4">
+          <MaterialIcon name="refresh" className="text-[16px]" />
+          Retry
+        </Button>
       </div>
     );
   }

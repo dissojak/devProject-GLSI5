@@ -66,10 +66,10 @@ export const PLAN_ACTION_ICONS: Record<"approve" | "reject" | "revise", Material
 
 export const PLAN_ACTION_VARIANTS: Record<
   "approve" | "reject" | "revise",
-  "mint" | "crimson" | "champagne"
+  "mint" | "danger" | "champagne"
 > = {
   approve: "mint",
-  reject: "crimson",
+  reject: "danger",
   revise: "champagne",
 };
 

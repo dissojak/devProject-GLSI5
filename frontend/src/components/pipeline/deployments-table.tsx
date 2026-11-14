@@ -16,6 +16,7 @@ import {
   DEPLOYMENTS_TABLE_COLUMNS,
 } from "@/data/deployments-board";
 import { PROJECTS_ROUTE } from "@/data/dashboard";
+import { Button } from "@/shared/button";
 import { MaterialIcon } from "@/shared/material-icon";
 import { cn } from "@/utils/class-names";
 import { formatPipelineDuration, pipelineProjectFallback } from "@/utils/pipeline-view";
@@ -139,15 +140,10 @@ function DeploymentRow({
         </td>
         <td className="px-4 py-3">
           {DEPLOYMENT_CANCELLABLE[row.status] ? (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => onCancel(row.id)}
-              className="flex items-center gap-1.5 rounded-full border border-crimson/40 bg-crimson/10 px-3 py-1.5 font-mono text-label-sm uppercase text-crimson transition-colors hover:bg-crimson/20 disabled:opacity-40"
-            >
-              <MaterialIcon name="close" className="text-[14px]" />
+            <Button variant="danger" size="sm" disabled={busy} onClick={() => onCancel(row.id)}>
+              <MaterialIcon name="close" className="text-[16px]" />
               {DEPLOYMENT_CANCEL_LABEL}
-            </button>
+            </Button>
           ) : (
             <span className="font-mono text-code-md text-cinder">—</span>
           )}

@@ -115,11 +115,11 @@ function PlanRejectForm({
         }}
       />
       <div className="flex items-center gap-2">
-        <Button type="submit" variant="crimson" disabled={invalid || submitting}>
-          <MaterialIcon name="block" className="text-[18px]" />
+        <Button type="submit" variant="crimson" size="sm" disabled={invalid || submitting}>
+          <MaterialIcon name="block" className="text-[16px]" />
           {PLAN_REJECT_FORM_ROW.action}
         </Button>
-        <Button variant="primary" onClick={onCancel}>
+        <Button variant="teal" size="sm" onClick={onCancel}>
           {PLAN_REJECT_FORM_ROW.cancel}
         </Button>
       </div>
@@ -286,10 +286,11 @@ function PlanRow({
                         <Button
                           key={action}
                           variant={PLAN_ACTION_VARIANTS[action]}
+                          size="sm"
                           disabled={busy}
                           onClick={() => onAction(row.id, action)}
                         >
-                          <MaterialIcon name={PLAN_ACTION_ICONS[action]} className="text-[18px]" />
+                          <MaterialIcon name={PLAN_ACTION_ICONS[action]} className="text-[16px]" />
                           {PLAN_ACTION_LABELS[action]}
                         </Button>
                       ))}

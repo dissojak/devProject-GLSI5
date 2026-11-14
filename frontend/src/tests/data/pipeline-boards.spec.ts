@@ -138,7 +138,7 @@ describe("pipeline board rows", () => {
       }
     }
     expect(PLAN_ACTION_VARIANTS.approve).toBe("mint");
-    expect(PLAN_ACTION_VARIANTS.reject).toBe("crimson");
+    expect(PLAN_ACTION_VARIANTS.reject).toBe("danger");
     expect(PLAN_ACTION_VARIANTS.revise).toBe("champagne");
     expect(PLAN_DEPLOY_TARGETS.map((row) => row.environment)).toEqual(ENVIRONMENTS);
     expect(PLAN_REJECT_FORM_ROW.action).toBe("Confirm rejection");

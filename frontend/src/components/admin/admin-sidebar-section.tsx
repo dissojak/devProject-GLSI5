@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useAuthSession } from "@/hooks/use-auth-session";
+import { useMounted } from "@/hooks/use-mounted";
 import { useListPendingUsersQuery } from "@/store/admin-api";
 import { ADMIN_SIDEBAR_ROW } from "@/data/admin";
 import { MaterialIcon } from "@/shared/material-icon";
@@ -15,7 +16,9 @@ const SECTION_LABEL = "Administration";
  * hook is never touched during prerender (Cache Components guard).
  */
 export function AdminSidebarSection() {
-  const { user } = useAuthSession();
+  const session = useAuthSession();
+  const mounted = useMounted();
+  const user = mounted ? session.user : null;
   const isAdmin = (user?.role ?? "").trim().toUpperCase() === "ADMIN";
   if (!isAdmin) {
     return null;

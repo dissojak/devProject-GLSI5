@@ -13,6 +13,7 @@ import {
 } from "@/data/analyses-board";
 import { PROJECTS_ROUTE } from "@/data/dashboard";
 import { Button } from "@/shared/button";
+import { cn } from "@/utils/class-names";
 import { MaterialIcon } from "@/shared/material-icon";
 import { formatPipelineDuration, pipelineProjectFallback } from "@/utils/pipeline-view";
 import { relativeTime } from "@/utils/relative-time";
@@ -105,11 +106,15 @@ export function AnalysesTable({ rows, projectNames, busyId, onDraft }: AnalysesT
                   {action ? (
                     <Button
                       variant={action.variant}
+                      size="sm"
                       disabled={busyId !== null}
                       aria-busy={busyId === row.id}
                       onClick={() => onDraft(row.project, row.id)}
                     >
-                      <MaterialIcon name={action.icon} className="text-[18px]" />
+                      <MaterialIcon
+                        name={busyId === row.id ? "progress_activity" : action.icon}
+                        className={cn("text-[16px]", busyId === row.id && "animate-spin")}
+                      />
                       {action.label}
                     </Button>
                   ) : null}

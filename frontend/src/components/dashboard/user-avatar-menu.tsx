@@ -14,6 +14,7 @@ import {
 } from "@/data/dashboard";
 import { AUTH_LOGIN_ROUTE } from "@/data/navigation";
 import { useAuthSession, useSessionClear } from "@/hooks/use-auth-session";
+import { useMounted } from "@/hooks/use-mounted";
 import { useAccountLogout } from "@/hooks/use-auth-request";
 import { useListPendingUsersQuery } from "@/store/admin-api";
 import { useListProjectsQuery } from "@/store/projects-api";
@@ -153,7 +154,10 @@ export function UserAvatarMenu() {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const { user, token } = useAuthSession();
+  const session = useAuthSession();
+  const mounted = useMounted();
+  const user = mounted ? session.user : null;
+  const token = session.token;
   const clearSession = useSessionClear();
   const { pending, logout } = useAccountLogout();
   const router = useRouter();
