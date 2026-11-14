@@ -12,6 +12,7 @@ import {
   resolveWorkflowSteps,
   resumeStepIndex,
   shouldAutoAdvance,
+  stepIdFrom,
 } from "@/utils/workflow-steps";
 import type { ProjectRequirement } from "@/types/workflow";
 
@@ -138,5 +139,13 @@ describe("workflow phases", () => {
     expect(phaseEntryStep(steps, kubernetes, railIds)).toBe("manifests");
     expect(phaseEntryStep(steps, analyse, railIds)).toBe("docker");
     expect(phaseEntryStep(steps, recommendations, railIds)).toBe("recommendations");
+  });
+});
+
+describe("step URL parameter", () => {
+  it("accepts known step ids and ignores anything else", () => {
+    expect(stepIdFrom(PROJECT_WORKFLOW_STEPS, "plan")).toBe("plan");
+    expect(stepIdFrom(PROJECT_WORKFLOW_STEPS, "nope")).toBeNull();
+    expect(stepIdFrom(PROJECT_WORKFLOW_STEPS, null)).toBeNull();
   });
 });

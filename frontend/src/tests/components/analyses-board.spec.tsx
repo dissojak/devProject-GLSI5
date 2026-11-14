@@ -16,10 +16,10 @@ import {
 import { appStore } from "@/store/store";
 import { sessionExpired } from "@/store/auth-session";
 
-const { replace } = vi.hoisted(() => ({ replace: vi.fn() }));
+const { replace, push } = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn() }));
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ replace }),
+  useRouter: () => ({ replace, push }),
 }));
 
 vi.mock("next/link", () => ({
@@ -30,6 +30,7 @@ vi.mock("next/link", () => ({
 afterEach(() => {
   resetBoardEnvironment();
   replace.mockClear();
+  push.mockClear();
 });
 
 beforeEach(() => {
@@ -150,6 +151,7 @@ describe("analyses board", () => {
       await (fetchMock.mock.calls[draftCall!.index][0] as Request).clone().text(),
     );
     expect(body).toEqual({ projectId: "prj_1", analysisId: "ana_1" });
+    expect(push).toHaveBeenCalledWith("/projects/prj_1?step=plan");
   });
 
   it("reports a failed draft through the failed toast with the server message", async () => {
@@ -173,6 +175,7 @@ describe("analyses board", () => {
     expect(
       await screen.findByText("Only a completed analysis can produce a plan draft"),
     ).toBeTruthy();
+    expect(push).not.toHaveBeenCalled();
   });
 
   it("offers no action while the analysis is still moving", async () => {

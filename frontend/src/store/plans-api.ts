@@ -16,12 +16,13 @@ export const plansApi = apiSlice.injectEndpoints({
     }),
     draftPlan: build.mutation<PlanResponse, { body: DraftPlanBody }>({
       query: ({ body }) => ({ url: "/plans", method: "POST", body }),
-      invalidatesTags: [{ type: "Plans", id: "ALL" }],
+      invalidatesTags: [{ type: "Plans", id: "ALL" }, "DeploymentPlans"],
     }),
     approvePlan: build.mutation<PlanResponse, { planId: string }>({
       query: ({ planId }) => ({ url: `/plans/${planId}/approve`, method: "POST" }),
       invalidatesTags: [
         { type: "Plans", id: "ALL" },
+        "DeploymentPlans",
         { type: "Deployments", id: "ALL" },
       ],
     }),
@@ -31,11 +32,11 @@ export const plansApi = apiSlice.injectEndpoints({
         method: "POST",
         body,
       }),
-      invalidatesTags: [{ type: "Plans", id: "ALL" }],
+      invalidatesTags: [{ type: "Plans", id: "ALL" }, "DeploymentPlans"],
     }),
     revisePlan: build.mutation<PlanResponse, { planId: string }>({
       query: ({ planId }) => ({ url: `/plans/${planId}/revisions`, method: "POST" }),
-      invalidatesTags: [{ type: "Plans", id: "ALL" }],
+      invalidatesTags: [{ type: "Plans", id: "ALL" }, "DeploymentPlans"],
     }),
     deployPlan: build.mutation<DeploymentResponse, { planId: string; body: DeployPlanBody }>({
       query: ({ planId, body }) => ({
@@ -45,6 +46,7 @@ export const plansApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: [
         { type: "Plans", id: "ALL" },
+        "DeploymentPlans",
         { type: "Deployments", id: "ALL" },
       ],
     }),

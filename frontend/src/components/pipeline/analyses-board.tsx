@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { AnalysesTable } from "@/components/pipeline/analyses-table";
 import { PipelineEmpty } from "@/components/pipeline/pipeline-empty";
@@ -19,6 +20,7 @@ import {
 } from "@/data/analyses-board";
 import { PIPELINE_FILTER_ALL_ID, PIPELINE_FILTER_EMPTY_NOTE, PIPELINE_SYNCING_NOTE } from "@/data/pipeline-boards";
 import { PROJECTS_ROUTE } from "@/data/dashboard";
+import { PROJECT_STEP_PARAM } from "@/data/project-workflow";
 import { AUTH_LOGIN_ROUTE } from "@/data/navigation";
 import { useAnalysisActions, useAnalysesBoard } from "@/hooks/use-analyses-board";
 import { useAuthGate } from "@/hooks/use-session-guard";
@@ -36,6 +38,7 @@ const statusOf = (row: Analysis) => row.status;
 export function AnalysesBoard() {
   const gate = useAuthGate(AUTH_LOGIN_ROUTE.href);
   const toast = useToast();
+  const router = useRouter();
   const [page, setPage] = useState(1);
   const [filter, setFilter] = useState(PIPELINE_FILTER_ALL_ID);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -57,6 +60,7 @@ export function AnalysesBoard() {
         const failure = await actions.draft(projectId, analysisId);
         if (failure === null) {
           toast.push(ANALYSES_TOAST_ROWS.drafted);
+          router.push(`${PROJECTS_ROUTE.href}/${projectId}?${PROJECT_STEP_PARAM}=plan`);
         } else {
           toast.push({
             tone: ANALYSES_TOAST_ROWS.failed.tone,
@@ -68,7 +72,7 @@ export function AnalysesBoard() {
         setBusyId(null);
       }
     },
-    [actions, toast],
+    [actions, router, toast],
   );
 
   if (gate !== "granted" || board.loading) {

@@ -57,3 +57,5 @@ export const PROJECT_PHASES: WorkflowPhase<ProjectStepId, ProjectPhaseId>[] = [
   { id: "kubernetes", label: "Kubernetes", stepIds: ["manifests", "server-validation", "deploy"] },
   { id: "operate", label: "Operate", stepIds: ["monitoring", "history"] },
 ];
+
+export const PROJECT_STEP_PARAM = "step";

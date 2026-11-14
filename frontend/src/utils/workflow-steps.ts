@@ -69,3 +69,10 @@ export function phaseStatus(steps: WorkflowStepView[]): WorkflowPhaseStatus {
   if (steps.every((step) => step.state === "locked")) return "locked";
   return "progress";
 }
+
+export function stepIdFrom<Id extends string>(
+  steps: readonly WorkflowStepDefinition<Id>[],
+  value: string | null,
+): Id | null {
+  return steps.find((step) => step.id === value)?.id ?? null;
+}

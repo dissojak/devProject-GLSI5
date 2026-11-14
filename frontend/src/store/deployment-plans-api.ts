@@ -52,6 +52,7 @@ export const deploymentPlansApi = apiSlice.injectEndpoints({
 
       invalidatesTags: (_result, _error, { projectId }) => [
         { type: "DeploymentPlans", id: projectId },
+        { type: "Plans", id: "ALL" },
       ],
     }),
 
@@ -77,6 +78,7 @@ export const deploymentPlansApi = apiSlice.injectEndpoints({
 
       invalidatesTags: (_result, _error, { projectId, planId }) => [
         { type: "DeploymentPlans", id: projectId },
+        { type: "Plans", id: "ALL" },
         { type: "DeploymentPlans", id: planId },
       ],
     }),
@@ -95,6 +97,7 @@ export const deploymentPlansApi = apiSlice.injectEndpoints({
 
       invalidatesTags: (_result, _error, { projectId, planId }) => [
         { type: "DeploymentPlans", id: projectId },
+        { type: "Plans", id: "ALL" },
         { type: "DeploymentPlans", id: planId },
       ],
     }),
@@ -115,6 +118,7 @@ export const deploymentPlansApi = apiSlice.injectEndpoints({
 
       invalidatesTags: (_result, _error, { projectId, planId }) => [
         { type: "DeploymentPlans", id: projectId },
+        { type: "Plans", id: "ALL" },
         { type: "DeploymentPlans", id: planId },
       ],
     }),

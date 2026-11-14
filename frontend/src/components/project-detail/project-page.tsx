@@ -16,6 +16,8 @@ import {
 import { useConnectProjectRepositoryMutation, useVerifyProjectRepositoryMutation, useUpdateProjectMutation, useDeleteProjectMutation } from "@/store/projects-api";
 import type { Analysis, AnalysisViewId } from "@/types/analysis";
 import type { ProjectStepId, WorkflowNavigation } from "@/types/workflow";
+import { PROJECT_STEP_PARAM, PROJECT_WORKFLOW_STEPS } from "@/data/project-workflow";
+import { stepIdFrom } from "@/utils/workflow-steps";
 import type { Project as ProjectType } from "@/types/project";
 import { ProjectHeader } from "@/components/project-detail/project-header";
 import { RepositoryCard } from "@/components/project-detail/repository-card";
@@ -44,7 +46,10 @@ function ProjectDetailInner() {
 
   const [page, setPage] = useState(1);
   const [analysisView, setAnalysisView] = useState<AnalysisViewId>("results");
-  const [navigation, setNavigation] = useState<WorkflowNavigation<ProjectStepId> | null>(null);
+  const [navigation, setNavigation] = useState<WorkflowNavigation<ProjectStepId> | null>(() => {
+    const requested = stepIdFrom(PROJECT_WORKFLOW_STEPS, searchParams.get(PROJECT_STEP_PARAM));
+    return requested ? { id: requested, token: 0 } : null;
+  });
   const [activeStep, setActiveStep] = useState<ProjectStepId | null>(null);
 
   const navigate = (step: ProjectStepId) => {

@@ -19,6 +19,7 @@ export const aiDeploymentPlanApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: (_result, _error, { projectId }) => [
         { type: "DeploymentPlans", id: projectId },
+        { type: "Plans", id: "ALL" },
       ],
     }),
   }),
