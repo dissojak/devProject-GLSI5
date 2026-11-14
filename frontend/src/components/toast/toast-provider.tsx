@@ -1,7 +1,14 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { cn } from "@/utils/class-names";
 import { MaterialIcon } from "@/shared/material-icon";
 import type { MaterialIconName } from "@/types/icons";
@@ -49,9 +56,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     window.setTimeout(() => dismiss(id), 4500);
     return id;
   }, [dismiss]);
+  const contextValue = useMemo(
+  () => ({ push, dismiss }),
+  [push, dismiss]
+);
 
   return (
-    <ToastContext.Provider value={{ push, dismiss }}>
+    <ToastContext.Provider value={contextValue}>
       {children}
       <div
         aria-live="polite"

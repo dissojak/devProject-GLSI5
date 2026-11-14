@@ -34,11 +34,43 @@ export interface AnalysisTechnology {
   category: TechnologyCategory;
   sourceFile?: string;
 }
+export interface AnalysisPortEvidence {
+  sourceFile: string;
+  origin:
+    | 'KUBERNETES_MANIFEST'
+    | 'SOURCE_CODE'
+    | 'FRAMEWORK_CONFIG'
+    | 'DOCKERFILE'
+    | 'ENV_EXAMPLE';
+  confidence: 'HIGH' | 'MEDIUM' | 'LOW';
+  requiresReview: boolean;
+  line?: number;
+}
+export interface AnalysisKubernetesEvidence {
+  containerPort: number | null;
+  servicePort: number | null;
+  targetPort: number | string | null;
+  image: string | null;
+  resources: {
+    requests: {
+      cpu: string | null;
+      memory: string | null;
+    };
+    limits: {
+      cpu: string | null;
+      memory: string | null;
+    };
+  } | null;
+    manifestPaths: string[];
+  requiresReview: boolean;
+  portEvidence?: AnalysisPortEvidence;
+}
 
 export interface AnalysisComponent {
   name: string;
   type: AnalysisComponentType;
   rootPath: string;
+  kubernetes?: AnalysisKubernetesEvidence;
 }
 
 export interface AnalysisDockerFinding {
@@ -121,11 +153,122 @@ const technologySchema = new Schema<AnalysisTechnology>(
   { _id: false },
 );
 
+const kubernetesQuantitySchema = new Schema(
+  {
+    cpu: { type: String, default: null },
+    memory: { type: String, default: null },
+  },
+  { _id: false },
+);
+
+const kubernetesResourcesSchema = new Schema(
+  {
+    requests: {
+      type: kubernetesQuantitySchema,
+      required: true,
+    },
+    limits: {
+      type: kubernetesQuantitySchema,
+      required: true,
+    },
+  },
+  { _id: false },
+);
+const portEvidenceSchema = new Schema<AnalysisPortEvidence>(
+  {
+    sourceFile: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    origin: {
+      type: String,
+      required: true,
+      enum: [
+        'KUBERNETES_MANIFEST',
+        'SOURCE_CODE',
+        'FRAMEWORK_CONFIG',
+        'DOCKERFILE',
+        'ENV_EXAMPLE',
+      ],
+    },
+    confidence: {
+      type: String,
+      required: true,
+      enum: ['HIGH', 'MEDIUM', 'LOW'],
+    },
+    requiresReview: {
+      type: Boolean,
+      required: true,
+    },
+    line: {
+      type: Number,
+      min: 1,
+    },
+  },
+  { _id: false },
+);
+const kubernetesEvidenceSchema =
+  new Schema<AnalysisKubernetesEvidence>(
+    {
+      containerPort: {
+        type: Number,
+        default: null,
+      },
+      servicePort: {
+        type: Number,
+        default: null,
+      },
+      targetPort: {
+        type: Schema.Types.Mixed,
+        default: null,
+      },
+      image: {
+        type: String,
+        default: null,
+      },
+      resources: {
+        type: kubernetesResourcesSchema,
+        default: null,
+      },
+      manifestPaths: {
+        type: [String],
+        default: [],
+      },
+            requiresReview: {
+        type: Boolean,
+        required: true,
+      },
+      portEvidence: {
+        type: portEvidenceSchema,
+        default: undefined,
+      },
+    },
+    { _id: false },
+  );
+
 const componentSchema = new Schema<AnalysisComponent>(
   {
-    name: { type: String, required: true, trim: true, minlength: 1 },
-    type: { type: String, required: true, enum: ANALYZED_COMPONENT_TYPES },
-    rootPath: { type: String, required: true, trim: true },
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+      minlength: 1,
+    },
+    type: {
+      type: String,
+      required: true,
+      enum: ANALYZED_COMPONENT_TYPES,
+    },
+    rootPath: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    kubernetes: {
+      type: kubernetesEvidenceSchema,
+      default: undefined,
+    },
   },
   { _id: false },
 );

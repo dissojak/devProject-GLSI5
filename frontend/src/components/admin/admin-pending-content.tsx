@@ -1,5 +1,7 @@
 "use client";
 
+import { Button } from "@/shared/button";
+
 import { AnimatePresence, motion } from "motion/react";
 import {
   ADMIN_GOVERNANCE_ROWS,
@@ -215,13 +217,10 @@ function AdminErrorBlock({ message, onRetry }: { message: string; onRetry: () =>
       className="flex items-center justify-between rounded-2xl border border-crimson/40 bg-crimson/10 px-6 py-5"
     >
       <p className="font-display text-body-md text-crimson">{message}</p>
-      <button
-        type="button"
-        onClick={onRetry}
-        className="font-display text-body-sm font-semibold text-ice hover:underline"
-      >
+      <Button variant="teal" size="sm" onClick={onRetry}>
+        <MaterialIcon name="refresh" className="text-[16px]" />
         {ADMIN_QUERY_FALLBACK.retry}
-      </button>
+      </Button>
     </div>
   );
 }

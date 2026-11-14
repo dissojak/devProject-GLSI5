@@ -87,4 +87,5 @@ export type MaterialIconName =
   | "key"
   | "key_off"
   | "info"
-  | "unfold_more";
+  | "unfold_more"
+  | "save";

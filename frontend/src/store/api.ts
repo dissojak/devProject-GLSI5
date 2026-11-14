@@ -42,6 +42,19 @@ const baseQueryWithSessionGuard: typeof baseQuery = async (
 export const apiSlice = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithSessionGuard,
-  tagTypes: ["Projects", "Project", "Analyses", "Recommendations", "PendingUsers", "Users", "Profile", "Plans", "Deployments"],
+  tagTypes: [
+    "Projects",
+    "Project",
+    "Analyses",
+    "Recommendations",
+    "PendingUsers",
+    "Users",
+    "Profile",
+    "Plans",
+    "Deployments",
+    "DeploymentPlans",
+    "GithubConnection",
+    "GithubRepositories",
+  ],
   endpoints: () => ({}),
 });

@@ -13,7 +13,7 @@ const RawEnvSchema = z.object({
   NODE_ENV: z.enum(ENV_NODE_ENV).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(4000),
   MONGODB_URI: z.string().trim().min(1, 'MONGODB_URI is required'),
-  CORS_ORIGINS: z.string().trim().min(1, 'CORS_ORIGINS is required (comma-separated origins list)'),
+  CORS_ORIGINS: z.string().trim().min(1, 'CORS_ORIGINS is required (comma-separated origins list, `*` wildcards allowed)'),
   LOG_LEVEL: z.enum(ENV_LOG_LEVEL).default('info'),
   TOKEN_ENCRYPTION_KEY: z
     .string()
@@ -24,6 +24,7 @@ const RawEnvSchema = z.object({
     ),
   GITHUB_CLIENT_ID: z.string().trim().min(1, 'GITHUB_CLIENT_ID is required'),
   GITHUB_CLIENT_SECRET: z.string().trim().min(1, 'GITHUB_CLIENT_SECRET is required'),
+  GITHUB_AUTOMATION_TOKEN: z.string().trim().optional(),
   GITHUB_CALLBACK_URL: z.string().trim().url('GITHUB_CALLBACK_URL must be a valid URL'),
   FRONTEND_URL: z.string().trim().url('FRONTEND_URL must be a valid URL'),
   SESSION_SECRET: z
@@ -47,17 +48,22 @@ const RawEnvSchema = z.object({
     .trim()
     .url('N8N_DEPLOYMENT_WEBHOOK_URL must be a valid URL')
     .optional(),
+  N8N_AI_PLAN_WEBHOOK_URL: z
+    .string()
+    .trim()
+    .url('N8N_AI_PLAN_WEBHOOK_URL must be a valid URL'),
 });
 
 export type Env = {
   nodeEnv: (typeof ENV_NODE_ENV)[number];
   port: number;
   mongodbUri: string;
-  corsOrigins: string[];
+  corsOrigins: (string | RegExp)[];
   logLevel: (typeof ENV_LOG_LEVEL)[number];
   tokenEncryptionKey: Buffer;
   githubClientId: string;
   githubClientSecret: string;
+  githubAutomationToken?: string | undefined;
   githubCallbackUrl: string;
   frontendUrl: string;
   sessionSecret: string;
@@ -65,15 +71,33 @@ export type Env = {
   n8nSharedSecret: string;
   n8nAiAuditWebhookUrl: string;
   n8nDeploymentWebhookUrl: string;
+  n8nAiPlanWebhookUrl: string;
 };
 
 let cachedEnv: Env | undefined;
 
-function parseOrigins(raw: string): string[] {
+/**
+ * `*` in an origin matches one run of host/port characters (no `/`, `:` or
+ * `.`), so `http://localhost:30*` allows ports 3000-3099 but can never be
+ * stretched into another host. Literal origins stay plain strings.
+ */
+function toOriginMatcher(origin: string): string | RegExp {
+  if (!origin.includes('*')) {
+    return origin;
+  }
+  const pattern = origin
+    .split('*')
+    .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('[^/:.]*');
+  return new RegExp(`^${pattern}$`);
+}
+
+function parseOrigins(raw: string): (string | RegExp)[] {
   const origins = raw
     .split(',')
     .map((part) => part.trim())
-    .filter((part) => part.length > 0);
+    .filter((part) => part.length > 0)
+    .map(toOriginMatcher);
   if (origins.length === 0) {
     throw new Error('CORS_ORIGINS must contain at least one origin');
   }
@@ -106,6 +130,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     tokenEncryptionKey: Buffer.from(parsed.data.TOKEN_ENCRYPTION_KEY, 'base64'),
     githubClientId: parsed.data.GITHUB_CLIENT_ID,
     githubClientSecret: parsed.data.GITHUB_CLIENT_SECRET,
+    githubAutomationToken: parsed.data.GITHUB_AUTOMATION_TOKEN,
     githubCallbackUrl: parsed.data.GITHUB_CALLBACK_URL,
     frontendUrl: parsed.data.FRONTEND_URL,
     sessionSecret: parsed.data.SESSION_SECRET,
@@ -113,6 +138,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     n8nSharedSecret: parsed.data.N8N_SHARED_SECRET,
     n8nAiAuditWebhookUrl: parsed.data.N8N_AI_AUDIT_WEBHOOK_URL,
     n8nDeploymentWebhookUrl: parsed.data.N8N_DEPLOYMENT_WEBHOOK_URL ?? '',
+    n8nAiPlanWebhookUrl: parsed.data.N8N_AI_PLAN_WEBHOOK_URL,
   };
 }
 

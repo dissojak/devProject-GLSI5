@@ -6,6 +6,13 @@ const tokenSchema = z.object({
   access_token: z.string().min(1),
 });
 
+const repositoryTokenSchema = z.object({
+  access_token: z.string().min(1),
+  scope: z.string().default(''),
+});
+
+const REPOSITORY_ACCESS_SCOPE = 'repo read:user';
+
 const profileSchema = z.object({
   id: z.number(),
   login: z.string(),
@@ -149,7 +156,69 @@ export function createGithubOAuthService(
     };
   }
 
-  return { getAuthorizationUrl, getProfile };
+  /**
+   * Repository access for an ALREADY signed-in user (separate from login):
+   * `repo` lets the app list and read private repositories too. The callback
+   * is a sub-path of the registered OAuth callback URL, as GitHub requires.
+   */
+  function getRepositoryAccessUrl(state: string): string {
+    const url = new URL('https://github.com/login/oauth/authorize');
+
+    url.searchParams.set('client_id', clientId);
+    url.searchParams.set('redirect_uri', repositoryCallbackUrl());
+    url.searchParams.set('scope', REPOSITORY_ACCESS_SCOPE);
+    url.searchParams.set('state', state);
+    url.searchParams.set('allow_signup', 'false');
+
+    return url.toString();
+  }
+
+  function repositoryCallbackUrl(): string {
+    return `${callbackUrl.replace(/\/+$/, '')}/repositories`;
+  }
+
+  async function exchangeRepositoryCode(
+    code: string,
+  ): Promise<{ token: string; scopes: string[]; login: string }> {
+    const token = await fetchGithubJson(
+      'https://github.com/login/oauth/access_token',
+      {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          client_id: clientId,
+          client_secret: clientSecret,
+          redirect_uri: repositoryCallbackUrl(),
+          code,
+        }),
+      },
+      repositoryTokenSchema,
+      'GitHub token exchange failed',
+    );
+
+    const profile = await fetchGithubJson(
+      'https://api.github.com/user',
+      { headers: apiHeaders(token.access_token) },
+      profileSchema,
+      'GitHub profile retrieval failed',
+    );
+
+    return {
+      token: token.access_token,
+      scopes: token.scope.split(/[\s,]+/).filter(Boolean),
+      login: profile.login,
+    };
+  }
+
+  return {
+    getAuthorizationUrl,
+    getProfile,
+    getRepositoryAccessUrl,
+    exchangeRepositoryCode,
+  };
 }
 
 /**

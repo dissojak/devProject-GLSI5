@@ -58,7 +58,7 @@ describe('createRepositoryLinkService.connect', () => {
 
     expect(findByIdForOwner).toHaveBeenCalledWith('p1', 'u1');
     expect(project.connectRepository).toHaveBeenCalledWith({ url: INPUT.url }, 'main');
-    expect(checkRepository).toHaveBeenCalledWith('octocat', 'Hello-World', 'main');
+    expect(checkRepository).toHaveBeenCalledWith('octocat', 'Hello-World', 'main', null);
     expect(project.markRepositoryVerified).toHaveBeenCalledWith('master');
     expect(project.markRepositoryInvalid).not.toHaveBeenCalled();
     expect(result).toBe(project);
@@ -106,7 +106,7 @@ describe('createRepositoryLinkService.verify', () => {
 
     await service.verify('u1', 'p1');
 
-    expect(checkRepository).toHaveBeenCalledWith('octocat', 'Hello-World', 'main');
+    expect(checkRepository).toHaveBeenCalledWith('octocat', 'Hello-World', 'main', null);
     expect(project.markRepositoryVerified).toHaveBeenCalledWith('main');
     expect(project.connectRepository).not.toHaveBeenCalled();
   });
@@ -118,5 +118,23 @@ describe('createRepositoryLinkService.verify', () => {
       'Project has no connected repository',
     );
     expect(checkRepository).not.toHaveBeenCalled();
+  });
+});
+
+describe('createRepositoryLinkService with a connected GitHub account', () => {
+  it('verifies the repository with the user\'s GitHub token', async () => {
+    const project = fakeProject();
+    const checkRepository = vi.fn().mockResolvedValue({ ok: true, defaultBranch: 'main' });
+    const tokenFor = vi.fn().mockResolvedValue('gho_token');
+    const service = createRepositoryLinkService(
+      { findByIdForOwner: vi.fn().mockResolvedValue(project) } as unknown as ProjectRepository,
+      { checkRepository } as unknown as GithubRepositoryService,
+      tokenFor,
+    );
+
+    await service.connect('u1', 'p1', INPUT);
+
+    expect(tokenFor).toHaveBeenCalledWith('u1');
+    expect(checkRepository).toHaveBeenCalledWith('octocat', 'Hello-World', 'main', 'gho_token');
   });
 });

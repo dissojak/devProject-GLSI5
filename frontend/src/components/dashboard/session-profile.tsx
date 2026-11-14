@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useAuthSession } from "@/hooks/use-auth-session";
+import { useMounted } from "@/hooks/use-mounted";
 import { useAccountLogout } from "@/hooks/use-auth-request";
 import { useSessionClear } from "@/hooks/use-auth-session";
 import { LOGOUT_ROUTE } from "@/data/dashboard";
@@ -9,7 +10,10 @@ import { initials, titleCase } from "@/utils/identity";
 import { MaterialIcon } from "@/shared/material-icon";
 
 export function DashboardProfileCard() {
-  const { user, token } = useAuthSession();
+  const session = useAuthSession();
+  const mounted = useMounted();
+  const user = mounted ? session.user : null;
+  const token = session.token;
   const { pending, logout } = useAccountLogout();
   const clearSession = useSessionClear();
   const router = useRouter();

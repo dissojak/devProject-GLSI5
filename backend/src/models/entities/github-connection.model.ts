@@ -39,6 +39,10 @@ export interface GithubConnectionStatics {
 export interface GithubConnectionMethods {
   getAccessToken(key: Uint8Array): string;
   rotateToken(key: Uint8Array, token: string): Promise<GithubConnectionDocument>;
+  reconnect(
+    key: Uint8Array,
+    input: { login: string; token: string; scopes: string[] },
+  ): Promise<GithubConnectionDocument>;
   revoke(): Promise<GithubConnectionDocument>;
 }
 
@@ -140,6 +144,20 @@ githubConnectionSchema.methods.rotateToken = async function rotateToken(
 ): Promise<GithubConnectionDocument> {
   requireActiveToken.call(this);
   this.set('accessToken', encrypt(key, token));
+
+  return this.save() as unknown as Promise<GithubConnectionDocument>;
+};
+
+githubConnectionSchema.methods.reconnect = async function reconnect(
+  this: GithubConnectionDocument,
+  key: Uint8Array,
+  input: { login: string; token: string; scopes: string[] },
+): Promise<GithubConnectionDocument> {
+  this.set('githubLogin', input.login);
+  this.set('accessToken', encrypt(key, input.token));
+  this.set('scopes', input.scopes);
+  this.set('connectedAt', new Date());
+  this.set('revokedAt', null);
 
   return this.save() as unknown as Promise<GithubConnectionDocument>;
 };

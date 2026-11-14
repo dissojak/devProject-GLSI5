@@ -18,13 +18,14 @@ type RepositoryCheck =
   | { ok: true; defaultBranch: string }
   | { ok: false; reason: string };
 
-async function fetchGithub(path: string): Promise<Response> {
+async function fetchGithub(path: string, token: string | null): Promise<Response> {
   try {
     return await fetch(`${GITHUB_API_URL}${path}`, {
       headers: {
         Accept: 'application/vnd.github+json',
         'X-GitHub-Api-Version': '2022-11-28',
         'User-Agent': 'deploymentplanner-ai',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       signal: AbortSignal.timeout(GITHUB_TIMEOUT_MS),
     });
@@ -50,11 +51,17 @@ export function createGithubRepositoryService() {
     owner: string,
     name: string,
     branch: string,
+    token: string | null = null,
   ): Promise<RepositoryCheck> {
-    const repoResponse = await fetchGithub(`/repos/${owner}/${name}`);
+    const repoResponse = await fetchGithub(`/repos/${owner}/${name}`, token);
 
     if (repoResponse.status === 404) {
-      return { ok: false, reason: 'Repository not found or not public' };
+      return {
+        ok: false,
+        reason: token
+          ? 'Repository not found, or your GitHub account has no access to it'
+          : 'Repository not found or not public. Connect GitHub to use private repositories',
+      };
     }
 
     assertReachable(repoResponse);
@@ -63,6 +70,7 @@ export function createGithubRepositoryService() {
 
     const branchResponse = await fetchGithub(
       `/repos/${owner}/${name}/branches/${branch}`,
+      token,
     );
 
     if (branchResponse.status === 404) {

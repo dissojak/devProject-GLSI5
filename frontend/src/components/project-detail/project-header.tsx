@@ -1,33 +1,18 @@
 "use client";
 
-import { motion } from "motion/react";
 import { cn } from "@/utils/class-names";
 import { MaterialIcon } from "@/shared/material-icon";
 import { Button } from "@/shared/button";
 import type { Project } from "@/types/project";
 
-const TABS = [
-  { id: "overview", label: "Overview" },
-  { id: "analyses", label: "Analyses" },
-  { id: "recommendations", label: "Recommendations" },
-] as const;
-
-export type ProjectTab = (typeof TABS)[number]["id"];
-
 export function ProjectHeader({
   project,
-  tab,
-  tabCounts,
-  onTab,
   onRun,
   running,
   launchPending,
   invalidRepo,
 }: {
   project: Project;
-  tab: ProjectTab;
-  tabCounts: { analyses: number };
-  onTab: (tab: ProjectTab) => void;
   onRun: () => void;
   running: boolean;
   launchPending: boolean;
@@ -77,45 +62,6 @@ export function ProjectHeader({
             </span>
           </Button>
         </div>
-      </div>
-      <div className="flex items-center gap-1 border-b border-steel/40">
-        {TABS.map((item) => {
-          const count = item.id === "analyses" ? tabCounts.analyses : null;
-          const locked = item.id === "recommendations" && tabCounts.analyses === 0;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              disabled={locked}
-              onClick={() => onTab(item.id)}
-              className={cn(
-                "relative px-4 py-2.5 font-display text-body-md transition-colors",
-                tab === item.id ? "text-foam" : "text-mist hover:text-foam",
-                locked && "cursor-not-allowed opacity-40",
-              )}
-            >
-              <span className="flex items-center gap-2">
-                {item.label}
-                {count !== null ? (
-                  <span className="rounded-full bg-surface-high px-2 py-0.5 font-mono text-label-sm text-mist">
-                    {count}
-                  </span>
-                ) : null}
-                {locked ? (
-                  <span className="rounded-full bg-champagne/20 px-2 py-0.5 font-mono text-label-sm text-champagne">
-                    Soon
-                  </span>
-                ) : null}
-              </span>
-              {tab === item.id ? (
-                <motion.span
-                  layoutId="project-tab-underline"
-                  className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-ice"
-                />
-              ) : null}
-            </button>
-          );
-        })}
       </div>
     </div>
   );

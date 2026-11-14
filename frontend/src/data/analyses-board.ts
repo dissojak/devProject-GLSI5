@@ -89,7 +89,7 @@ export const ANALYSES_TOAST_ROWS = {
   drafted: {
     tone: "champagne",
     title: "Plan draft created",
-    message: "The container contract is on the plans board, ready for review.",
+    message: "Opening it in the project workflow (step 04) to review, add images and approve.",
   },
   failed: {
     tone: "crimson",

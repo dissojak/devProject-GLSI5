@@ -65,7 +65,10 @@ describe('createGithubRepositoryService', () => {
 
     const result = await service.checkRepository('octocat', 'nope', 'main');
 
-    expect(result).toEqual({ ok: false, reason: 'Repository not found or not public' });
+    expect(result).toEqual({
+      ok: false,
+      reason: 'Repository not found or not public. Connect GitHub to use private repositories',
+    });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
@@ -101,5 +104,18 @@ describe('createGithubRepositoryService', () => {
 
     await expect(call).rejects.toBeInstanceOf(InvariantViolationError);
     await expect(call).rejects.toThrow('GitHub is unreachable, try again later');
+  });
+
+  it('authenticates with the user token so private repositories pass', async () => {
+    const fetchMock = stubFetch(
+      jsonResponse(200, { default_branch: 'main' }),
+      jsonResponse(200, { name: 'main' }),
+    );
+
+    const result = await service.checkRepository('octocat', 'secret', 'main', 'gho_token');
+
+    expect(result).toEqual({ ok: true, defaultBranch: 'main' });
+    const headers = (fetchMock.mock.calls[0]?.[1] as RequestInit).headers as Record<string, string>;
+    expect(headers.Authorization).toBe('Bearer gho_token');
   });
 });
